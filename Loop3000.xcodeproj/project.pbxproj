@@ -12,6 +12,7 @@
 		669C586328A47B4D0038A986 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 669C586228A47B4D0038A986 /* ContentView.swift */; };
 		669C586528A47B4E0038A986 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 669C586428A47B4E0038A986 /* Assets.xcassets */; };
 		669C586828A47B4E0038A986 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 669C586728A47B4E0038A986 /* Preview Assets.xcassets */; };
+		66E77E5528A54CA400FE6C1E /* AsyncReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66E77E5428A54CA300FE6C1E /* AsyncReader.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -22,6 +23,7 @@
 		669C586428A47B4E0038A986 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		669C586728A47B4E0038A986 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		669C586928A47B4E0038A986 /* Loop3000.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Loop3000.entitlements; sourceTree = "<group>"; };
+		66E77E5428A54CA300FE6C1E /* AsyncReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AsyncReader.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -60,6 +62,7 @@
 				669C586428A47B4E0038A986 /* Assets.xcassets */,
 				669C586928A47B4E0038A986 /* Loop3000.entitlements */,
 				669C586628A47B4E0038A986 /* Preview Content */,
+				66E77E5428A54CA300FE6C1E /* AsyncReader.swift */,
 			);
 			path = Loop3000;
 			sourceTree = "<group>";
@@ -143,6 +146,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				669C586328A47B4D0038A986 /* ContentView.swift in Sources */,
+				66E77E5528A54CA400FE6C1E /* AsyncReader.swift in Sources */,
 				661B751628A47C9900B9C012 /* Discoverer.swift in Sources */,
 				669C586128A47B4D0038A986 /* Loop3000App.swift in Sources */,
 			);

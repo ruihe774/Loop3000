@@ -153,7 +153,9 @@ protocol FileParser {
 struct CueSheetParser: FileParser {
     private static let linePartRegex = /(".+?"|.+?)\s+/
 
-    struct InvalidFormat: Error {}
+    struct InvalidFormat: Error {
+        let url: URL
+    }
     struct FileNotFound: Error {
         let url: URL
     }
@@ -203,7 +205,7 @@ struct CueSheetParser: FileParser {
                     tracks.append(previousTrack)
                 }
                 guard let file = currentFile else {
-                    throw InvalidFormat()
+                    throw InvalidFormat(url: url)
                 }
                 currentTrack = Track(source: file, start: Timestamp.init(rawValue: -1), end: Timestamp.init(rawValue: -1))
             case ("INDEX", 2):
@@ -212,7 +214,7 @@ struct CueSheetParser: FileParser {
                       let number = Int(params[0]),
                       let timestamp = Timestamp(fromCueTimestampString: params[1])
                 else {
-                    throw InvalidFormat()
+                    throw InvalidFormat(url: url)
                 }
                 switch number {
                 case 0:
@@ -294,5 +296,39 @@ struct CueSheetParser: FileParser {
             track.discNumber = discNumber
         }
         return (albums: [album], tracks: tracks)
+    }
+}
+
+protocol Grabber {
+    func grab(tracks: [Track]) async throws
+}
+
+struct FLACGrabber {
+    struct InvalidFormat: Error {
+        let url: URL
+    }
+
+    func grab(tracks: [Track]) async throws {
+        let sources = Set(tracks.map {$0.source})
+        let metadatas = await withThrowingTaskGroup(of: (source: URL, metadata: Metadata).self) { taskGroup in
+            for source in sources {
+                taskGroup.addTask {
+                    var reader = AsyncReader(source.resourceBytes)
+                    if try await reader.read(count: 4) != Data([0x66, 0x4C, 0x61, 0x43]) {
+                        throw InvalidFormat(url: source)
+                    }
+                    var last = false
+                    repeat {
+                        let header = try await reader.readEnough(count: 4)
+                        last = (header[0] & 1) != 0
+                        let type = header[0] & ~1
+                        let length = (Int(header[1]) << 16) + (Int(header[2]) << 8) + Int(header[3])
+                        print(length)
+                        let _ = try await reader.readEnough(count: length)
+                    } while !last
+                    return (source: source, metadata: Metadata())
+                }
+            }
+        }
     }
 }
