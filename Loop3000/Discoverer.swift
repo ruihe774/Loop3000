@@ -78,6 +78,17 @@ private func loadContent(from url: URL) async throws -> String {
     return content
 }
 
+extension URL {
+    mutating func replacePathExtension(_ pathExtension: String) {
+        deletePathExtension()
+        appendPathExtension(pathExtension)
+    }
+
+    func replacingPathExtension(_ pathExtension: String) -> Self {
+        deletingPathExtension().appendingPathExtension(pathExtension)
+    }
+}
+
 protocol FileParser {
     func parse(url: URL) async throws -> (albums: [Album], tracks: [Track])
 }
@@ -116,11 +127,11 @@ struct CueSheetParser: FileParser {
                 var file = URL(filePath: filePath, relativeTo: url.deletingLastPathComponent())
                 if file.isFileURL && !FileManager.default.fileExists(atPath: file.path) {
                     // When compressing using FLAC, EAC retain .wav suffix in cue
-                    file.deletePathExtension()
-                    file.appendPathExtension("flac")
-                    if !FileManager.default.fileExists(atPath: file.path) {
+                    let flacFile = file.replacingPathExtension("flac")
+                    guard FileManager.default.fileExists(atPath: flacFile.path) else {
                         throw FileNotFound(url: file)
                     }
+                    file = flacFile
                 }
                 currentFile = file
             case ("TRACK", let params) where params.count == 2:
