@@ -4,7 +4,7 @@ import AVFoundation
 
 struct Timestamp: Codable {
     static let timeScale = 75
-    private static let CueTimestampRegex = /(\d\d):(\d\d):(\d\d)/
+    private static let cueTimestampRegex = /(\d\d):(\d\d):(\d\d)/
     var rawValue: Int
 
     init(rawValue: Int) {
@@ -18,7 +18,7 @@ struct Timestamp: Codable {
     }
 
     init?(fromCueTimestampString s: String) {
-        guard let match = try? Timestamp.CueTimestampRegex.wholeMatch(in: s) else { return nil }
+        guard let match = try? Timestamp.cueTimestampRegex.wholeMatch(in: s) else { return nil }
         self.init(minutes: Int(match.1)!, seconds: Int(match.2)!, frames: Int(match.3)!)
     }
 
@@ -35,6 +35,45 @@ extension CMTime {
     }
 }
 
+struct Metadata: Codable {
+    struct CommonKey {
+        static let title = "TITLE"
+        static let version = "VERSION"
+        static let album = "ALBUM"
+        static let trackNumber = "TRACKNUMBER"
+        static let artist = "ARTIST"
+        static let performer = "PERFORMER"
+        static let composer = "COMPOSER"
+        static let copyright = "COPYRIGHT"
+        static let license = "LICENSE"
+        static let organization = "ORGANIZATION"
+        static let description = "DESCRIPTION"
+        static let genre = "GENRE"
+        static let date = "DATE"
+        static let location = "LOCATION"
+        static let ISRC = "ISRC"
+        static let totalDicsc = "TOTALDISCS"
+        static let totalTracks = "TOTALTRACKS"
+        static let comment = "COMMENT"
+    }
+
+    enum Value: Codable {
+        case single(String)
+        case multiple([String])
+    }
+
+    var mapping: [String: Value] = [:]
+
+    subscript(key: String) -> Value? {
+        get {
+            mapping[key]
+        }
+        set {
+            mapping[key] = newValue
+        }
+    }
+}
+
 class Track: Codable {
     var source: URL
     var start: Timestamp
@@ -43,8 +82,8 @@ class Track: Codable {
     var title: String?
     var artists: [String]?
     var trackNumber: Int?
-    var diskNumber: Int?
-    var extraMetadata: [String: String] = [:]
+    var discNumber: Int?
+    var extraMetadata = Metadata()
 
     init(source: URL, start: Timestamp, end: Timestamp) {
         self.source = source
@@ -57,11 +96,29 @@ class Album: Codable {
     var tracks: [Track] = []
     var title: String?
     var artists: [String]?
-    var trackCountInDiscs: [Int]?
-    var extraMetadata: [String: String] = [:]
+    var extraMetadata = Metadata()
 }
 
 struct DecodeError: Error {}
+
+private func universalSplit(_ s: String) -> [String] {
+    s
+        .split {",;，；、\r\n".contains($0)}
+        .map {$0.trimmingCharacters(in: .whitespaces)}
+        .filter {!$0.isEmpty}
+}
+
+private func universalMetadataSplit(_ s: String) -> Metadata.Value? {
+    let ss = universalSplit(s)
+    switch ss.count {
+    case 0:
+        return nil
+    case 1:
+        return .single(ss[0])
+    default:
+        return .multiple(ss)
+    }
+}
 
 private func loadContent(from url: URL) async throws -> String {
     let (data, response) = try await URLSession.shared.data(from: url)
@@ -106,7 +163,8 @@ struct CueSheetParser: FileParser {
         var currentFile: URL?
         var currentTrack: Track?
         var tracks: [Track] = []
-        var albums: [Album] = []
+        var album = Album()
+        var discNumber: Int?
         for line in content.split(whereSeparator: \.isNewline) {
             var parts: [Substring] = []
             var remaining = (line.trimmingCharacters(in: .whitespaces) + " ")[...]
@@ -117,12 +175,18 @@ struct CueSheetParser: FileParser {
             if parts.isEmpty {
                 continue
             }
-            print(parts)
             let command = parts[0].uppercased()
             let params = parts[1...].map{$0.trimmingCharacters(in: CharacterSet(charactersIn: "\""))}
-            switch (command, params) {
-            case ("FILE", let params) where params.count == 2:
-                print(params)
+            func setMetadata(_ rawValue: String = params[0], for key: String, split: Bool = false) {
+                let value = split ? universalMetadataSplit(rawValue) : .single(rawValue)
+                if let track = currentTrack {
+                    track.extraMetadata[key] = value
+                } else {
+                    album.extraMetadata[key] = value
+                }
+            }
+            switch (command, params.count) {
+            case ("FILE", 2):
                 let filePath = String(params[0])
                 var file = URL(filePath: filePath, relativeTo: url.deletingLastPathComponent())
                 if file.isFileURL && !FileManager.default.fileExists(atPath: file.path) {
@@ -134,7 +198,7 @@ struct CueSheetParser: FileParser {
                     file = flacFile
                 }
                 currentFile = file
-            case ("TRACK", let params) where params.count == 2:
+            case ("TRACK", 2):
                 if let previousTrack = currentTrack {
                     tracks.append(previousTrack)
                 }
@@ -142,7 +206,7 @@ struct CueSheetParser: FileParser {
                     throw InvalidFormat()
                 }
                 currentTrack = Track(source: file, start: Timestamp.init(rawValue: -1), end: Timestamp.init(rawValue: -1))
-            case ("INDEX", let params) where params.count == 2:
+            case ("INDEX", 2):
                 guard let file = currentFile,
                       let track = currentTrack,
                       let number = Int(params[0]),
@@ -152,15 +216,47 @@ struct CueSheetParser: FileParser {
                 }
                 switch number {
                 case 0:
-                    if tracks.last?.source == track.source {
-                        tracks.last!.end = timestamp
+                    if let previousTrack = tracks.last, previousTrack.source == track.source {
+                        previousTrack.end = timestamp
                     }
                 case 1:
                     track.source = file
                     track.start = timestamp
-                    if tracks.last?.source == track.source && tracks.last!.end.rawValue == -1 {
-                        tracks.last!.end = timestamp
+                    if let previousTrack = tracks.last,
+                       previousTrack.source == track.source && previousTrack.end.rawValue == -1 {
+                        previousTrack.end = timestamp
                     }
+                default:
+                    ()
+                }
+            case ("SONGWRITER", 1):
+                setMetadata(for: Metadata.CommonKey.composer, split: true)
+            case ("ISRC", 1):
+                setMetadata(for: Metadata.CommonKey.ISRC)
+            case ("PERFORMER", 1):
+                let artists = universalSplit(params[0])
+                if let track = currentTrack {
+                    track.artists = artists
+                } else {
+                    album.artists = artists
+                }
+            case ("TITLE", 1):
+                let title = params[0]
+                if let track = currentTrack {
+                    track.title = title
+                } else {
+                    album.title = title
+                }
+            case ("REM", 2):
+                switch params[0] {
+                case "DATE":
+                    setMetadata(params[1], for: Metadata.CommonKey.date)
+                case "COMPOSER":
+                    setMetadata(params[1], for: Metadata.CommonKey.composer, split: true)
+                case "GENRE":
+                    setMetadata(params[1], for: Metadata.CommonKey.genre)
+                case "DISCNUMBER":
+                    discNumber = Int(params[1])
                 default:
                     ()
                 }
@@ -191,6 +287,12 @@ struct CueSheetParser: FileParser {
         for track in tracksWithUnknownEnd {
             track.end = durations[track.source]!
         }
-        return (albums: albums, tracks: tracks)
+        album.tracks = tracks
+        for (i, track) in tracks.enumerated() {
+            track.album = album
+            track.trackNumber = i + 1
+            track.discNumber = discNumber
+        }
+        return (albums: [album], tracks: tracks)
     }
 }
