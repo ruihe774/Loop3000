@@ -78,17 +78,18 @@ class Track: Codable {
     var source: URL
     var start: Timestamp
     var end: Timestamp
-    weak var album: Album?
+    unowned var album: Album
     var title: String?
     var artists: [String]?
     var trackNumber: Int?
     var discNumber: Int?
     var extraMetadata = Metadata()
 
-    init(source: URL, start: Timestamp, end: Timestamp) {
+    init(source: URL, start: Timestamp, end: Timestamp, album: Album) {
         self.source = source
         self.start = start
         self.end = end
+        self.album = album
     }
 }
 
@@ -207,7 +208,12 @@ struct CueSheetParser: FileParser {
                 guard let file = currentFile else {
                     throw InvalidFormat(url: url)
                 }
-                currentTrack = Track(source: file, start: Timestamp.init(rawValue: -1), end: Timestamp.init(rawValue: -1))
+                currentTrack = Track(
+                    source: file,
+                    start: Timestamp.init(rawValue: -1),
+                    end: Timestamp.init(rawValue: -1),
+                    album: album
+                )
             case ("INDEX", 2):
                 guard let file = currentFile,
                       let track = currentTrack,
@@ -291,7 +297,6 @@ struct CueSheetParser: FileParser {
         }
         album.tracks = tracks
         for (i, track) in tracks.enumerated() {
-            track.album = album
             track.trackNumber = i + 1
             track.discNumber = discNumber
         }
