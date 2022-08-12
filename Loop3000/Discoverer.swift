@@ -52,8 +52,6 @@ struct Metadata: Codable {
         static let date = "DATE"
         static let location = "LOCATION"
         static let ISRC = "ISRC"
-        static let totalDicsc = "TOTALDISCS"
-        static let totalTracks = "TOTALTRACKS"
         static let comment = "COMMENT"
     }
 
