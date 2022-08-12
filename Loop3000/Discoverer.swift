@@ -685,9 +685,9 @@ fileprivate struct FLACGrabber: MetadataGrabber {
                     let data = try await reader.readEnough(count: commentLength)
                     totalReadCount += 4 + commentLength
                     guard let comment = String(data: data, encoding: .utf8) else { continue }
-                    let parts = comment.split(separator: "=", maxSplits: 2).map { String($0) }
+                    let parts = comment.split(separator: "=", maxSplits: 2)
                     if parts.count == 2 {
-                        let (key, value) = (parts[0], parts[1])
+                        let (key, value) = (parts[0].uppercased(), String(parts[1]))
                         metadata[key] = value
                     }
                 }
