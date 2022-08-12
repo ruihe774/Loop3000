@@ -37,6 +37,7 @@ struct ContentView: View {
     var musicLibrary = MusicLibrary()
     @State var libraryJSON: JSONDocument?
     @State var discovering = false
+    @State var errMsg: String?
 
     var body: some View {
         VStack {
@@ -51,7 +52,10 @@ struct ContentView: View {
                     Task {
                         discovering = true
                         defer { discovering = false }
-                        print(try! await musicLibrary.discover(at: url, recursive: true))
+                        let errors = try! await musicLibrary.discover(at: url, recursive: true).errors
+                        DispatchQueue.main.async {
+                            errMsg = "\(errors)"
+                        }
                     }
                 }
                 Button("Export Library") {
@@ -63,6 +67,9 @@ struct ContentView: View {
                 .fileExporter(isPresented: $showJSONExporter, document: libraryJSON, contentType: .json) { result in
                     let _ = try! result.get()
                 }
+            }
+            if let errMsg = errMsg {
+                Text(verbatim: errMsg)
             }
         }
     }
