@@ -33,8 +33,9 @@ struct JSONDocument: FileDocument {
 
 struct ContentView: View {
     @State var showMediaImporter = false
+    @State var showLibraryImporter = false
     @State var showJSONExporter = false
-    var musicLibrary = MusicLibrary()
+    @State var musicLibrary = MusicLibrary()
     @State var libraryJSON: JSONDocument?
     @State var discovering = false
     @State var errMsg: String?
@@ -57,6 +58,17 @@ struct ContentView: View {
                             errMsg = "\(errors)"
                         }
                     }
+                }
+                Button("Import Library") {
+                    showLibraryImporter = true
+                }
+                .fileImporter(isPresented: $showLibraryImporter, allowedContentTypes: [.json]) { result in
+                    let url = try! result.get()
+                    let json = JSONDecoder()
+                    musicLibrary = try! json.decode(MusicLibrary.self, from: try! Data(contentsOf: url))
+                }
+                Button("Consolidate") {
+                    musicLibrary.consolidate()
                 }
                 Button("Export Library") {
                     let json = JSONEncoder()
