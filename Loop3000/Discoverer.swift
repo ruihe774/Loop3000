@@ -53,6 +53,7 @@ struct Metadata: Codable {
         static let location = "LOCATION"
         static let ISRC = "ISRC"
         static let comment = "COMMENT"
+        static let encoder = "ENCODER"
     }
 
     enum Value: Codable {
@@ -164,7 +165,7 @@ struct CueSheetParser: FileParser {
         var currentFile: URL?
         var currentTrack: Track?
         var tracks: [Track] = []
-        var album = Album()
+        let album = Album()
         var discNumber: Int?
         for line in content.split(whereSeparator: \.isNewline) {
             var parts: [Substring] = []
@@ -311,9 +312,14 @@ struct FLACGrabber {
         let url: URL
     }
 
+    private func parse32bitIntLE(_ data: Data) -> Int {
+        precondition(data.count == 4)
+        return Int(data[0]) | Int(data[1] << 8) | Int(data[2] << 16) | Int(data[3] << 24)
+    }
+
     func grab(tracks: [Track]) async throws {
-        let sources = Set(tracks.map {$0.source})
-        let metadatas = await withThrowingTaskGroup(of: (source: URL, metadata: Metadata).self) { taskGroup in
+        let sources = Set(tracks.map {$0.source}).filter {$0.pathExtension == "flac"}
+        let metadatas = try await withThrowingTaskGroup(of: (source: URL, metadata: Metadata).self) { taskGroup in
             for source in sources {
                 taskGroup.addTask {
                     var reader = AsyncReader(source.resourceBytes)
@@ -321,17 +327,49 @@ struct FLACGrabber {
                         throw InvalidFormat(url: source)
                     }
                     var last = false
+                    var metadata = Metadata()
                     repeat {
                         let header = try await reader.readEnough(count: 4)
-                        last = (header[0] & 1) != 0
-                        let type = header[0] & ~1
-                        let length = (Int(header[1]) << 16) + (Int(header[2]) << 8) + Int(header[3])
-                        print(length)
-                        let _ = try await reader.readEnough(count: length)
+                        last = (header[0] >> 7) != 0
+                        let type = header[0] & 0x7f
+                        let length = Int(header[1]) << 16 | Int(header[2]) << 8 | Int(header[3])
+                        switch type {
+                        case 4: // VORBIS_COMMENT
+                            let vendorStringLength = parse32bitIntLE(try await reader.readEnough(count: 4))
+                            let vendorString = try await reader.readEnough(count: vendorStringLength)
+                            metadata[Metadata.CommonKey.encoder] = String(data: vendorString, encoding: .utf8).map {.single($0)}
+                            let vectorLength = parse32bitIntLE(try await reader.readEnough(count: 4))
+                            var totalReadCount = 8 + vendorStringLength
+                            for _ in 0 ..< vectorLength {
+                                let commentLength = parse32bitIntLE(try await reader.readEnough(count: 4))
+                                let data = try await reader.readEnough(count: commentLength)
+                                totalReadCount += 4 + commentLength
+                                guard let comment = String(data: data, encoding: .utf8) else {
+                                    continue
+                                }
+                                let parts = comment.split(separator: "=", maxSplits: 2).map {String($0)}
+                                let (key, value) = (parts[0], parts[1])
+                                metadata[key] = .single(value)
+                            }
+                            if totalReadCount != length {
+                                throw InvalidFormat(url: source)
+                            }
+                        default:
+                            let _ = try await reader.readEnough(count: length)
+                        }
                     } while !last
-                    return (source: source, metadata: Metadata())
+                    return (source: source, metadata: metadata)
                 }
             }
+            var metadatas = [URL: Metadata]()
+            for try await item in taskGroup {
+                metadatas[item.source] = item.metadata
+            }
+            return metadatas
+        }
+        for track in tracks {
+            guard let newMetadata = metadatas[track.source] else {continue}
+            newMetadata.mapping.forEach { (k, v) in track.extraMetadata[k] = v }
         }
     }
 }
