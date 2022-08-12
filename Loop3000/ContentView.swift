@@ -34,7 +34,7 @@ struct JSONDocument: FileDocument {
 struct ContentView: View {
     @State var showMediaImporter = false
     @State var showJSONExporter = false
-    var musicLibrary = MusicLibrary()
+    @State var musicLibrary = MusicLibrary()
     @State var libraryJSON: JSONDocument?
 
     var body: some View {
