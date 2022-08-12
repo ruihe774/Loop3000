@@ -212,7 +212,7 @@ fileprivate extension Array where Element: Identifiable {
     }
 }
 
-class MusicLibrary: ObservableObject, Codable {
+class MusicLibrary: Codable {
     static var mediaImporters: [any MediaImporter] = [CueSheetImporter(), AVImporter()]
     static var metadataGrabbers: [any MetadataGrabber] = [FLACGrabber(), AVGrabber()]
 
@@ -224,8 +224,8 @@ class MusicLibrary: ObservableObject, Codable {
         Self.metadataGrabbers.flatMap { $0.supportedTypes }
     }
 
-    @Published var albums = [Album]()
-    @Published var tracks = [Track]()
+    var albums = [Album]()
+    var tracks = [Track]()
 
     struct NoApplicableImporter: Error {
         let url: URL
@@ -621,23 +621,5 @@ fileprivate struct AVGrabber: MetadataGrabber {
             metadata[mappedKey] = value
         }
         return metadata
-    }
-}
-
-extension Published: Decodable where Value: Decodable {
-    public init(from decoder: Decoder) throws {
-        let decoded = try Value(from: decoder)
-        self.init(initialValue: decoded)
-    }
-}
-
-extension Published: Encodable where Value: Encodable {
-    private var wrappedValue: Value {
-        let mirror = Mirror(reflecting: self)
-        return mirror.descendant("storage", "value")! as! Value
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        try wrappedValue.encode(to: encoder)
     }
 }
