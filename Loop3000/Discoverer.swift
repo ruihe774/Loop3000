@@ -108,12 +108,17 @@ struct MetadataCommonKey {
     static let albumArtist = "ALBUMARTIST"
     static let performer = "PERFORMER"
     static let composer = "COMPOSER"
+    static let author = "AUTHOR"
+    static let contributor = "CONTRIBUTOR"
+    static let creator = "CREATOR"
+    static let publisher = "PUBLISHER"
     static let copyright = "COPYRIGHT"
     static let license = "LICENSE"
     static let organization = "ORGANIZATION"
     static let description = "DESCRIPTION"
     static let genre = "GENRE"
     static let date = "DATE"
+    static let language = "LANGUAGE"
     static let location = "LOCATION"
     static let ISRC = "ISRC"
     static let comment = "COMMENT"
@@ -208,7 +213,7 @@ fileprivate extension Array where Element: Identifiable {
 
 class MusicLibrary: Codable {
     static var mediaImporters: [any MediaImporter] = [CueSheetImporter()]
-    static var metadataGrabbers: [any MetadataGrabber] = [FLACGrabber()]
+    static var metadataGrabbers: [any MetadataGrabber] = [FLACGrabber(), AVGrabber()]
 
     var albums = [Album]()
     var tracks = [Track]()
@@ -516,6 +521,37 @@ fileprivate struct FLACGrabber: MetadataGrabber {
                 let _ = try await reader.readEnough(count: length)
             }
         } while !last
+        return metadata
+    }
+}
+
+fileprivate struct AVGrabber: MetadataGrabber {
+    let supportedTypes = [UTType.audio]
+
+    private static let keyMapping: [AVMetadataKey: String] = [
+        .commonKeyAlbumName: MetadataCommonKey.album,
+        .commonKeyArtist: MetadataCommonKey.artist,
+        .commonKeyAuthor: MetadataCommonKey.author,
+        .commonKeyContributor: MetadataCommonKey.contributor,
+        .commonKeyCopyrights: MetadataCommonKey.copyright,
+        .commonKeyCreator: MetadataCommonKey.creator,
+        .commonKeyTitle: MetadataCommonKey.title,
+        .commonKeyDescription: MetadataCommonKey.description,
+        .commonKeyLanguage: MetadataCommonKey.language,
+        .commonKeyLocation: MetadataCommonKey.location,
+        .commonKeyPublisher: MetadataCommonKey.publisher,
+    ]
+
+    func grabMetadata(url: URL) async throws -> Metadata {
+        let asset = AVAsset(url: url)
+        let avMetadata = try await asset.load(.metadata)
+        var metadata = Metadata()
+        for item in avMetadata {
+            guard let commonKey = item.commonKey else { continue }
+            guard let mappedKey = Self.keyMapping[commonKey] else { continue }
+            guard let value = try await item.load(.stringValue) else { continue }
+            metadata[mappedKey] = value
+        }
         return metadata
     }
 }
