@@ -36,26 +36,33 @@ struct ContentView: View {
     @State var showJSONExporter = false
     @State var musicLibrary = MusicLibrary()
     @State var libraryJSON: JSONDocument?
+    @State var discovering = false
 
     var body: some View {
         VStack {
-            Button("Import Media") {
-                showMediaImporter = true
-            }
-            .fileImporter(isPresented: $showMediaImporter, allowedContentTypes: musicLibrary.canImportTypes) { result in
-                let url = try! result.get()
-                Task {
-                    try! await musicLibrary.importMedia(from: url)
+            if discovering {
+                ProgressView()
+            } else {
+                Button("Discover Media") {
+                    showMediaImporter = true
                 }
-            }
-            Button("Export Library") {
-                let json = JSONEncoder()
-                json.outputFormatting = [.prettyPrinted, .withoutEscapingSlashes]
-                libraryJSON = JSONDocument(try! json.encode(musicLibrary))
-                showJSONExporter = true
-            }
-            .fileExporter(isPresented: $showJSONExporter, document: libraryJSON, contentType: .json) { result in
-                let _ = try! result.get()
+                .fileImporter(isPresented: $showMediaImporter, allowedContentTypes: [.folder]) { result in
+                    let url = try! result.get()
+                    Task {
+                        discovering = true
+                        defer { discovering = false }
+                        print(try! await musicLibrary.discover(at: url, recursive: true))
+                    }
+                }
+                Button("Export Library") {
+                    let json = JSONEncoder()
+                    json.outputFormatting = [.prettyPrinted, .withoutEscapingSlashes]
+                    libraryJSON = JSONDocument(try! json.encode(musicLibrary))
+                    showJSONExporter = true
+                }
+                .fileExporter(isPresented: $showJSONExporter, document: libraryJSON, contentType: .json) { result in
+                    let _ = try! result.get()
+                }
             }
         }
     }

@@ -10,6 +10,7 @@ struct Timestamp: Equatable {
 
     static let timeScale = 75
 
+    static let zero = Timestamp(value: 0)
     static let invalid = Timestamp(value: -1)
     static let indefinite = Timestamp(value: -2)
     static let negativeInfinity = Timestamp(value: -3)
@@ -212,8 +213,16 @@ fileprivate extension Array where Element: Identifiable {
 }
 
 class MusicLibrary: ObservableObject, Codable {
-    static var mediaImporters: [any MediaImporter] = [CueSheetImporter()]
+    static var mediaImporters: [any MediaImporter] = [CueSheetImporter(), AVImporter()]
     static var metadataGrabbers: [any MetadataGrabber] = [FLACGrabber(), AVGrabber()]
+
+    var canImportTypes: [UTType] {
+        Self.mediaImporters.flatMap { $0.supportedTypes }
+    }
+
+    var canGrabTypes: [UTType] {
+        Self.metadataGrabbers.flatMap { $0.supportedTypes }
+    }
 
     @Published var albums = [Album]()
     @Published var tracks = [Track]()
@@ -222,7 +231,11 @@ class MusicLibrary: ObservableObject, Codable {
         let url: URL
     }
 
-    func importMedia(from url: URL) async throws {
+    struct FileNotFound: Error {
+        let url: URL
+    }
+
+    func importMedia(from url: URL) async throws -> (importedAlbums: [Album], importedTracks: [Track]) {
         guard let type = UTType(filenameExtension: url.pathExtension) else {
             throw NoApplicableImporter(url: url)
         }
@@ -275,14 +288,55 @@ class MusicLibrary: ObservableObject, Codable {
 
         self.albums.append(contentsOf: albums)
         self.tracks.append(contentsOf: tracks)
+
+        return (importedAlbums: albums, importedTracks: tracks)
     }
 
-    var canImportTypes: [UTType] {
-        Self.mediaImporters.flatMap { $0.supportedTypes }
+    func discover(at url: URL, recursive: Bool = false)
+    async throws -> (importedAlbums: [Album], importedTracks: [Track], errors: [Error]) {
+        var r = (importedAlbums: [Album](), importedTracks: [Track](), errors: [Error]())
+        let fileManager = FileManager.default
+        var children = Set(try fileManager.contentsOfDirectory(
+            at: url, includingPropertiesForKeys: [.isDirectoryKey], options: .skipsHiddenFiles
+        ).map { $0.absoluteURL })
+        for importer in Self.mediaImporters {
+            let applicableFiles = children.filter { url in
+                guard let type = UTType(filenameExtension: url.pathExtension) else { return false }
+                return importer.supportedTypes.contains { type.conforms(to: $0) }
+            }
+            for url in applicableFiles {
+                do {
+                    let item = try await self.importMedia(from: url)
+                    children.subtract(item.importedTracks.map { $0.source.absoluteURL })
+                } catch let error {
+                    r.errors.append(error)
+                }
+            }
+        }
+        if recursive {
+            try await withThrowingTaskGroup(
+                of: (importedAlbums: [Album], importedTracks: [Track], errors: [Error]).self
+            ) { taskGroup in
+                for child in children {
+                    let isDirectory = try child.resourceValues(forKeys: [.isDirectoryKey]).isDirectory ?? false
+                    if isDirectory {
+                        taskGroup.addTask {
+                            try await self.discover(at: child)
+                        }
+                    }
+                }
+                for try await orv in taskGroup {
+                    r.importedAlbums.append(contentsOf: orv.importedAlbums)
+                    r.importedTracks.append(contentsOf: orv.importedTracks)
+                    r.errors.append(contentsOf: orv.errors)
+                }
+            }
+        }
+        return r
     }
 
-    var canGrabTypes: [UTType] {
-        Self.metadataGrabbers.flatMap { $0.supportedTypes }
+    func consolidate() {
+
     }
 }
 
@@ -474,6 +528,18 @@ fileprivate struct CueSheetImporter: MediaImporter {
     }
 }
 
+fileprivate struct AVImporter: MediaImporter {
+    let supportedTypes = [UTType.audio]
+
+    func importMedia(url: URL) async throws -> (albums: [Album], tracks: [Track]) {
+        let asset = AVAsset(url: url)
+        let duration = try await asset.load(.duration)
+        let album = Album()
+        let track = Track(source: url, start: .zero, end: Timestamp(from: duration), albumId: album.id)
+        return (albums: [album], tracks: [track])
+    }
+}
+
 fileprivate struct FLACGrabber: MetadataGrabber {
     let supportedTypes = [UTType("org.xiph.flac")!]
 
@@ -511,8 +577,10 @@ fileprivate struct FLACGrabber: MetadataGrabber {
                     totalReadCount += 4 + commentLength
                     guard let comment = String(data: data, encoding: .utf8) else { continue }
                     let parts = comment.split(separator: "=", maxSplits: 2).map { String($0) }
-                    let (key, value) = (parts[0], parts[1])
-                    metadata[key] = value
+                    if parts.count == 2 {
+                        let (key, value) = (parts[0], parts[1])
+                        metadata[key] = value
+                    }
                 }
                 if totalReadCount != length {
                     throw InvalidFormat(url: url)
