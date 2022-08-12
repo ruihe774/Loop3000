@@ -11,10 +11,10 @@ struct Timestamp: Equatable {
     static let timeScale = 75
 
     static let zero = Timestamp(value: 0)
-    static let invalid = Timestamp(value: -1)
-    static let indefinite = Timestamp(value: -2)
-    static let negativeInfinity = Timestamp(value: -3)
-    static let positiveInfinity = Timestamp(value: -4)
+    static let invalid = Timestamp(valueUnchecked: -1)
+    static let indefinite = Timestamp(valueUnchecked: -2)
+    static let negativeInfinity = Timestamp(valueUnchecked: -3)
+    static let positiveInfinity = Timestamp(valueUnchecked: -4)
 
     init() {
         self = Self.invalid
@@ -23,6 +23,10 @@ struct Timestamp: Equatable {
     init(value: Int) {
         precondition(value >= 0)
         self.value = value
+    }
+
+    private init(valueUnchecked: Int) {
+        self.value = valueUnchecked
     }
 
     init(minutes: Int, seconds: Int, frames: Int) {
@@ -273,7 +277,7 @@ class MusicLibrary: Codable {
             guard let metadata = metadatas[track.source] else {
                 continue
             }
-            metadata.forEach { (k, v) in track.metadata[k] = v }
+            track.metadata.merge(metadata) { (_, new) in new }
         }
 
         for track in tracks {
@@ -338,7 +342,110 @@ class MusicLibrary: Codable {
     }
 
     func consolidate() {
+        var unconsolidatedTracks = tracks
+        var consolidatedTracks: [Track] = []
+        while var track = unconsolidatedTracks.popLast() {
+            unconsolidatedTracks = unconsolidatedTracks.compactMap {
+                guard let mergedTrack = mergeTracks(track, $0) else { return $0 }
+                track = mergedTrack
+                return nil
+            }
+            consolidatedTracks.append(track)
+        }
+        tracks = consolidatedTracks
 
+        var usedAlbumIds = Set<UUID>()
+        for track in tracks {
+            usedAlbumIds.insert(track.albumId)
+        }
+        var unconsolidatedAlbums = albums.filter { usedAlbumIds.contains($0.id) }
+        var consolidatedAlbums: [Album] = []
+        while var album = unconsolidatedAlbums.popLast() {
+            unconsolidatedAlbums = unconsolidatedAlbums.compactMap {
+                guard let mergedAlbum = mergeAlbums(album, $0) else { return $0 }
+                album = mergedAlbum
+                return nil
+            }
+            consolidatedAlbums.append(album)
+        }
+        albums = consolidatedAlbums
+    }
+
+    private func mergeTracks(_ a: Track, _ b: Track) -> Track? {
+        guard a.source == b.source else { return nil }
+        guard abs(a.start.value - b.start.value) < 500 || a.start.value < 0 || b.start.value < 0 else { return nil }
+        guard abs(a.end.value - b.end.value) < 500 || a.end.value < 0 || b.end.value < 0 else { return nil }
+        let durationA = a.start.value >= 0 && a.end.value >= 0 ? a.end.value - a.start.value : .max
+        let durationB = b.start.value >= 0 && b.end.value >= 0 ? b.end.value - b.start.value : .max
+        let selected = durationA == durationB ? (a.albumId.uuidString < b.albumId.uuidString ? a : b) : (durationA < durationB ? a : b)
+        let abandoned = selected.id == a.id ? b : a
+        selected.metadata.merge(abandoned.metadata) { (cur, _) in cur }
+        return selected
+    }
+
+    private func mergeAlbums(_ a: Album, _ b: Album) -> Album? {
+        guard let titleA = a.metadata[MetadataCommonKey.title] else { return nil }
+        guard let titleB = b.metadata[MetadataCommonKey.title] else { return nil }
+        guard titleA == titleB else { return nil }
+        let tracksA = getTracks(for: a)
+        let tracksB = getTracks(for: b)
+        let artistInAlbumA = a.metadata[MetadataCommonKey.artist]
+        let artistInAlbumB = b.metadata[MetadataCommonKey.artist]
+        let artistA = artistInAlbumA ?? commonMetadata(tracksA, for: MetadataCommonKey.artist)
+        let artistB = artistInAlbumB ?? commonMetadata(tracksB, for: MetadataCommonKey.artist)
+        guard artistA == artistB else { return nil }
+        for trackA in tracksA {
+            if tracksB.contains(where: { trackB in
+                if trackA.metadata[MetadataCommonKey.title] == trackB.metadata[MetadataCommonKey.title] { return true }
+                if let trackNumberA = trackA.metadata[MetadataCommonKey.trackNumber].flatMap({ Int($0) }),
+                    let trackNumberB = trackB.metadata[MetadataCommonKey.trackNumber].flatMap({ Int($0) }),
+                    trackNumberA == trackNumberB {
+                        if let discNumberA = trackA.metadata[MetadataCommonKey.discNumber].flatMap({ Int($0) }),
+                           let discNumberB = trackB.metadata[MetadataCommonKey.discNumber].flatMap({ Int($0) }) {
+                            return discNumberA == discNumberB
+                        } else {
+                            return true
+                        }
+                } else {
+                    return false
+                }
+            }) {
+                return nil
+            }
+            if tracksB.contains(where: { trackB in
+                guard trackA.metadata[MetadataCommonKey.encoder] == trackB.metadata[MetadataCommonKey.encoder] else {
+                    return true
+                }
+                guard trackA.metadata[MetadataCommonKey.organization] == trackB.metadata[MetadataCommonKey.organization] else {
+                    return true
+                }
+                return false
+            }) {
+                return nil
+            }
+        }
+        let selected = a.id < b.id ? a : b
+        let abandoned = selected.id == a.id ? b : a
+        selected.metadata.merge(abandoned.metadata) { (cur, _) in cur }
+        return selected
+    }
+
+    private func commonMetadata(_ tracks: [Track], for key: String) -> String? {
+        var values = Set<String>()
+        for track in tracks {
+            if let value = track.metadata[key] {
+                values.insert(value)
+            }
+        }
+        if values.count == 1 {
+            return values.first!
+        } else {
+            return nil
+        }
+    }
+
+    func getTracks(for album: Album) -> [Track] {
+        tracks.filter { $0.albumId == album.id }
     }
 }
 
