@@ -21,6 +21,7 @@ struct Timestamp: Equatable {
     }
 
     init(value: Int) {
+        precondition(value >= 0)
         self.value = value
     }
 
