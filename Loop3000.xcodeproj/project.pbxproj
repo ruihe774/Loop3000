@@ -17,6 +17,7 @@
 
 /* Begin PBXFileReference section */
 		661B751528A47C9800B9C012 /* Discoverer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Discoverer.swift; sourceTree = "<group>"; };
+		66732F6E28A63F400089682A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		669C585D28A47B4D0038A986 /* Loop3000.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Loop3000.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		669C586028A47B4D0038A986 /* Loop3000App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Loop3000App.swift; sourceTree = "<group>"; };
 		669C586228A47B4D0038A986 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -56,6 +57,7 @@
 		669C585F28A47B4D0038A986 /* Loop3000 */ = {
 			isa = PBXGroup;
 			children = (
+				66732F6E28A63F400089682A /* Info.plist */,
 				661B751528A47C9800B9C012 /* Discoverer.swift */,
 				669C586028A47B4D0038A986 /* Loop3000App.swift */,
 				669C586228A47B4D0038A986 /* ContentView.swift */,
@@ -280,6 +282,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"Loop3000/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Loop3000/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -305,6 +308,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"Loop3000/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Loop3000/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

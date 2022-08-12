@@ -1,20 +1,32 @@
 import Foundation
 import CoreMedia
 import AVFoundation
+import UniformTypeIdentifiers
 
-struct Timestamp: Codable {
-    static let timeScale = 75
+struct Timestamp: Equatable {
     private static let cueTimestampRegex = /(\d\d):(\d\d):(\d\d)/
-    var rawValue: Int
 
-    init(rawValue: Int) {
-        self.rawValue = rawValue
+    var value: Int
+
+    static let timeScale = 75
+
+    static let invalid = Timestamp(value: -1)
+    static let indefinite = Timestamp(value: -2)
+    static let negativeInfinity = Timestamp(value: -3)
+    static let positiveInfinity = Timestamp(value: -4)
+
+    init() {
+        self = Self.invalid
+    }
+
+    init(value: Int) {
+        self.value = value
     }
 
     init(minutes: Int, seconds: Int, frames: Int) {
         let totalSeconds = minutes * 60 + seconds
-        let totalFrames = totalSeconds * Timestamp.timeScale + frames
-        self.init(rawValue: totalFrames)
+        let totalFrames = totalSeconds * Self.timeScale + frames
+        self.init(value: totalFrames)
     }
 
     init?(fromCueTimestampString s: String) {
@@ -23,119 +35,265 @@ struct Timestamp: Codable {
     }
 
     init(from time: CMTime) {
-        let cmScale = Int(time.timescale)
-        let num = Int(time.value) * Timestamp.timeScale + cmScale / 2
-        self.init(rawValue: num / cmScale)
+        switch time {
+        case .invalid:
+            self = Self.invalid
+        case .indefinite:
+            self = Self.indefinite
+        case .negativeInfinity:
+            self = Self.negativeInfinity
+        case .positiveInfinity:
+            self = Self.positiveInfinity
+        default:
+            self.init(value: Int(time.value) * Timestamp.timeScale / Int(time.timescale))
+        }
+    }
+
+    var minutes: Int {
+        value / Self.timeScale / 60
+    }
+
+    var seconds: Int {
+        value / Self.timeScale % 60
+    }
+
+    var frames: Int {
+        value % Self.timeScale
+    }
+
+    var description: String {
+        String(format: "%02d:%02d:%02d", minutes, seconds, frames)
     }
 }
 
 extension CMTime {
     init(from timestamp: Timestamp) {
-        self.init(value: CMTimeValue(timestamp.rawValue), timescale: CMTimeScale(Timestamp.timeScale))
-    }
-}
-
-struct Metadata: Codable {
-    struct CommonKey {
-        static let title = "TITLE"
-        static let version = "VERSION"
-        static let album = "ALBUM"
-        static let trackNumber = "TRACKNUMBER"
-        static let artist = "ARTIST"
-        static let performer = "PERFORMER"
-        static let composer = "COMPOSER"
-        static let copyright = "COPYRIGHT"
-        static let license = "LICENSE"
-        static let organization = "ORGANIZATION"
-        static let description = "DESCRIPTION"
-        static let genre = "GENRE"
-        static let date = "DATE"
-        static let location = "LOCATION"
-        static let ISRC = "ISRC"
-        static let comment = "COMMENT"
-        static let encoder = "ENCODER"
-    }
-
-    enum Value: Codable {
-        case single(String)
-        case multiple([String])
-    }
-
-    var mapping: [String: Value] = [:]
-
-    subscript(key: String) -> Value? {
-        get {
-            mapping[key]
-        }
-        set {
-            mapping[key] = newValue
+        switch timestamp {
+        case .invalid:
+            self = Self.invalid
+        case .indefinite:
+            self = Self.indefinite
+        case .negativeInfinity:
+            self = Self.negativeInfinity
+        case .positiveInfinity:
+            self = Self.positiveInfinity
+        default:
+            self.init(value: CMTimeValue(timestamp.value), timescale: CMTimeScale(Timestamp.timeScale))
         }
     }
 }
 
-class Track: Codable {
+extension Timestamp: Codable {
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(description)
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let s = try container.decode(String.self)
+        self.init(fromCueTimestampString: s)!
+    }
+}
+
+typealias Metadata = [String: String]
+
+struct MetadataCommonKey {
+    static let title = "TITLE"
+    static let version = "VERSION"
+    static let album = "ALBUM"
+    static let trackNumber = "TRACKNUMBER"
+    static let discNumber = "DISCNUMBER"
+    static let artist = "ARTIST"
+    static let albumArtist = "ALBUMARTIST"
+    static let performer = "PERFORMER"
+    static let composer = "COMPOSER"
+    static let copyright = "COPYRIGHT"
+    static let license = "LICENSE"
+    static let organization = "ORGANIZATION"
+    static let description = "DESCRIPTION"
+    static let genre = "GENRE"
+    static let date = "DATE"
+    static let location = "LOCATION"
+    static let ISRC = "ISRC"
+    static let comment = "COMMENT"
+    static let encoder = "ENCODER"
+}
+
+class Album: Identifiable, Codable {
+    var id = UUID()
+    var metadata = Metadata()
+}
+
+class Track: Identifiable, Codable {
+    var id = UUID()
     var source: URL
     var start: Timestamp
     var end: Timestamp
-    unowned var album: Album
-    var title: String?
-    var artists: [String]?
-    var trackNumber: Int?
-    var discNumber: Int?
-    var extraMetadata = Metadata()
+    var albumId: UUID
+    var metadata = Metadata()
 
-    init(source: URL, start: Timestamp, end: Timestamp, album: Album) {
+    init(source: URL, start: Timestamp, end: Timestamp, albumId: UUID) {
         self.source = source
         self.start = start
         self.end = end
+        self.albumId = albumId
+    }
+}
+
+struct PlayItem {
+    let track: Track
+    let album: Album
+
+    private func universalSplit(_ s: String) -> [String] {
+        s
+            .split { ",;，；、\r\n".contains($0) }
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+    }
+
+    var title: String {
+        track.metadata[MetadataCommonKey.title] ?? track.source.lastPathComponent
+    }
+
+    var artists: [String] {
+        universalSplit(
+            track.metadata[MetadataCommonKey.artist] ??
+            album.metadata[MetadataCommonKey.artist] ??
+            ""
+        )
+    }
+
+    var trackNumber: Int? {
+        if let numberString = track.metadata[MetadataCommonKey.trackNumber] {
+            return Int(numberString)
+        } else {
+            return nil
+        }
+    }
+
+    var discNumber: Int? {
+        if let numberString = track.metadata[MetadataCommonKey.discNumber] {
+            return Int(numberString)
+        } else {
+            return nil
+        }
+    }
+
+    var albumTitle: String? {
+        album.metadata[MetadataCommonKey.title]
+    }
+
+    var albumArtists: [String] {
+        universalSplit(
+            album.metadata[MetadataCommonKey.artist] ??
+            ""
+        )
+    }
+
+    init(track: Track, album: Album) {
+        assert(track.albumId == album.id)
+        self.track = track
         self.album = album
     }
 }
 
-class Album: Codable {
-    var tracks: [Track] = []
-    var title: String?
-    var artists: [String]?
-    var extraMetadata = Metadata()
-}
-
-struct DecodeError: Error {}
-
-private func universalSplit(_ s: String) -> [String] {
-    s
-        .split {",;，；、\r\n".contains($0)}
-        .map {$0.trimmingCharacters(in: .whitespaces)}
-        .filter {!$0.isEmpty}
-}
-
-private func universalMetadataSplit(_ s: String) -> Metadata.Value? {
-    let ss = universalSplit(s)
-    switch ss.count {
-    case 0:
-        return nil
-    case 1:
-        return .single(ss[0])
-    default:
-        return .multiple(ss)
+fileprivate extension Array where Element: Identifiable {
+    func getElementById(id: Element.ID) -> Element? {
+        self.first {
+            $0.id == id
+        }
     }
 }
 
-private func loadContent(from url: URL) async throws -> String {
-    let (data, response) = try await URLSession.shared.data(from: url)
-    let encodingValue = response.textEncodingName
-            .map { $0 as CFString }
-            .map { CFStringConvertIANACharSetNameToEncoding($0) }
-            .map { CFStringConvertEncodingToNSStringEncoding($0) }
-        ?? NSString.stringEncoding(for: data, convertedString: nil, usedLossyConversion: nil)
-    // Fallback to utf8
-    let encoding: String.Encoding = encodingValue == 0 ? .utf8 : .init(rawValue: encodingValue)
-    guard let content = String(data: data, encoding: encoding) else {
-        throw DecodeError()
+class MusicLibrary: Codable {
+    static var mediaImporters: [any MediaImporter] = [CueSheetImporter()]
+    static var metadataGrabbers: [any MetadataGrabber] = [FLACGrabber()]
+
+    var albums = [Album]()
+    var tracks = [Track]()
+
+    struct NoApplicableImporter: Error {
+        let url: URL
     }
-    return content
+
+    func importMedia(from url: URL) async throws {
+        guard let type = UTType(filenameExtension: url.pathExtension) else {
+            throw NoApplicableImporter(url: url)
+        }
+        guard let importer = Self.mediaImporters.first(where: { importer in
+            importer.supportedTypes.contains { type.conforms(to: $0) }
+        }) else {
+            throw NoApplicableImporter(url: url)
+        }
+
+        let (albums, tracks) = try await importer.importMedia(url: url)
+
+        let sources = Set(tracks.map { $0.source })
+        let metadatas = try await withThrowingTaskGroup(of: (source: URL, metadata: Metadata).self) { taskGroup in
+            for source in sources {
+                guard let type = UTType(filenameExtension: source.pathExtension) else {
+                    continue
+                }
+                guard let grabber = Self.metadataGrabbers.first(where: { grabber in
+                    grabber.supportedTypes.contains { type.conforms(to: $0) }
+                }) else {
+                    continue
+                }
+                taskGroup.addTask {
+                    (source: source, metadata: try await grabber.grabMetadata(url: source))
+                }
+            }
+            var metadatas = [URL: Metadata]()
+            for try await item in taskGroup {
+                metadatas[item.source] = item.metadata
+            }
+            return metadatas
+        }
+        for track in tracks {
+            guard let metadata = metadatas[track.source] else {
+                continue
+            }
+            metadata.forEach { (k, v) in track.metadata[k] = v }
+        }
+
+        for track in tracks {
+            if let album = track.metadata[MetadataCommonKey.album] {
+                albums.getElementById(id: track.albumId)!.metadata[MetadataCommonKey.title] = album
+                track.metadata[MetadataCommonKey.album] = nil
+            }
+            if let albumArtist = track.metadata[MetadataCommonKey.albumArtist] {
+                albums.getElementById(id: track.albumId)!.metadata[MetadataCommonKey.artist] = albumArtist
+                track.metadata[MetadataCommonKey.albumArtist] = nil
+            }
+        }
+
+        self.albums.append(contentsOf: albums)
+        self.tracks.append(contentsOf: tracks)
+    }
+
+    var canImportTypes: [UTType] {
+        Self.mediaImporters.flatMap { $0.supportedTypes }
+    }
+
+    var canGrabTypes: [UTType] {
+        Self.metadataGrabbers.flatMap { $0.supportedTypes }
+    }
 }
 
-extension URL {
+protocol MediaImporter {
+    var supportedTypes: [UTType] { get }
+
+    func importMedia(url: URL) async throws -> (albums: [Album], tracks: [Track])
+}
+
+protocol MetadataGrabber {
+    var supportedTypes: [UTType] { get }
+
+    func grabMetadata(url: URL) async throws -> Metadata
+}
+
+fileprivate extension URL {
     mutating func replacePathExtension(_ pathExtension: String) {
         deletePathExtension()
         appendPathExtension(pathExtension)
@@ -146,21 +304,39 @@ extension URL {
     }
 }
 
-protocol FileParser {
-    func parse(url: URL) async throws -> (albums: [Album], tracks: [Track])
-}
+fileprivate struct CueSheetImporter: MediaImporter {
+    let supportedTypes = [UTType("io.misakikasumi.Loop3000.CueSheet")!]
 
-struct CueSheetParser: FileParser {
     private static let linePartRegex = /(".+?"|.+?)\s+/
 
     struct InvalidFormat: Error {
         let url: URL
     }
+
     struct FileNotFound: Error {
         let url: URL
     }
 
-    func parse(url: URL) async throws -> (albums: [Album], tracks: [Track]) {
+    struct DecodeError: Error {
+        let url: URL
+    }
+
+    private func loadContent(from url: URL) async throws -> String {
+        let (data, response) = try await URLSession.shared.data(from: url)
+        let encodingValue = response.textEncodingName
+                .map { $0 as CFString }
+                .map { CFStringConvertIANACharSetNameToEncoding($0) }
+                .map { CFStringConvertEncodingToNSStringEncoding($0) }
+            ?? NSString.stringEncoding(for: data, convertedString: nil, usedLossyConversion: nil)
+        // Fallback to utf8
+        let encoding: String.Encoding = encodingValue == 0 ? .utf8 : .init(rawValue: encodingValue)
+        guard let content = String(data: data, encoding: encoding) else {
+            throw DecodeError(url: url)
+        }
+        return content
+    }
+
+    func importMedia(url: URL) async throws -> (albums: [Album], tracks: [Track]) {
         let content = try await loadContent(from: url)
         var currentFile: URL?
         var currentTrack: Track?
@@ -170,7 +346,7 @@ struct CueSheetParser: FileParser {
         for line in content.split(whereSeparator: \.isNewline) {
             var parts: [Substring] = []
             var remaining = (line.trimmingCharacters(in: .whitespaces) + " ")[...]
-            while let match = try! CueSheetParser.linePartRegex.firstMatch(in: remaining) {
+            while let match = try! Self.linePartRegex.firstMatch(in: remaining) {
                 remaining = remaining[match.range.upperBound...]
                 parts.append(match.1)
             }
@@ -178,19 +354,20 @@ struct CueSheetParser: FileParser {
                 continue
             }
             let command = parts[0].uppercased()
-            let params = parts[1...].map{$0.trimmingCharacters(in: CharacterSet(charactersIn: "\""))}
-            func setMetadata(_ rawValue: String = params[0], for key: String, split: Bool = false) {
-                let value = split ? universalMetadataSplit(rawValue) : .single(rawValue)
+            let params = parts[1...].map { $0.trimmingCharacters(in: CharacterSet(charactersIn: "\"")) }
+            func setMetadata(_ value: String = params[0], for key: String) {
+                if value.isEmpty {
+                    return
+                }
                 if let track = currentTrack {
-                    track.extraMetadata[key] = value
+                    track.metadata[key] = value
                 } else {
-                    album.extraMetadata[key] = value
+                    album.metadata[key] = value
                 }
             }
             switch (command, params.count) {
             case ("FILE", 2):
-                let filePath = String(params[0])
-                var file = URL(filePath: filePath, relativeTo: url.deletingLastPathComponent())
+                var file = URL(filePath: params[0], relativeTo: url.deletingLastPathComponent())
                 if file.isFileURL && !FileManager.default.fileExists(atPath: file.path) {
                     // When compressing using FLAC, EAC retain .wav suffix in cue
                     let flacFile = file.replacingPathExtension("flac")
@@ -209,9 +386,9 @@ struct CueSheetParser: FileParser {
                 }
                 currentTrack = Track(
                     source: file,
-                    start: Timestamp.init(rawValue: -1),
-                    end: Timestamp.init(rawValue: -1),
-                    album: album
+                    start: .invalid,
+                    end: .invalid,
+                    albumId: album.id
                 )
             case ("INDEX", 2):
                 guard let file = currentFile,
@@ -230,38 +407,28 @@ struct CueSheetParser: FileParser {
                     track.source = file
                     track.start = timestamp
                     if let previousTrack = tracks.last,
-                       previousTrack.source == track.source && previousTrack.end.rawValue == -1 {
+                       previousTrack.source == track.source && previousTrack.end == .invalid {
                         previousTrack.end = timestamp
                     }
                 default:
                     ()
                 }
             case ("SONGWRITER", 1):
-                setMetadata(for: Metadata.CommonKey.composer, split: true)
+                setMetadata(for: MetadataCommonKey.composer)
             case ("ISRC", 1):
-                setMetadata(for: Metadata.CommonKey.ISRC)
+                setMetadata(for: MetadataCommonKey.ISRC)
             case ("PERFORMER", 1):
-                let artists = universalSplit(params[0])
-                if let track = currentTrack {
-                    track.artists = artists
-                } else {
-                    album.artists = artists
-                }
+                setMetadata(for: MetadataCommonKey.artist)
             case ("TITLE", 1):
-                let title = params[0]
-                if let track = currentTrack {
-                    track.title = title
-                } else {
-                    album.title = title
-                }
+                setMetadata(for: MetadataCommonKey.title)
             case ("REM", 2):
                 switch params[0] {
                 case "DATE":
-                    setMetadata(params[1], for: Metadata.CommonKey.date)
+                    setMetadata(params[1], for: MetadataCommonKey.date)
                 case "COMPOSER":
-                    setMetadata(params[1], for: Metadata.CommonKey.composer, split: true)
+                    setMetadata(params[1], for: MetadataCommonKey.composer)
                 case "GENRE":
-                    setMetadata(params[1], for: Metadata.CommonKey.genre)
+                    setMetadata(params[1], for: MetadataCommonKey.genre)
                 case "DISCNUMBER":
                     discNumber = Int(params[1])
                 default:
@@ -274,15 +441,15 @@ struct CueSheetParser: FileParser {
         if let previousTrack = currentTrack {
             tracks.append(previousTrack)
         }
-        tracks = tracks.filter {$0.start.rawValue != -1}
-        let tracksWithUnknownEnd = tracks.filter {$0.end.rawValue == -1}
-        let sourcesNeedDuration = Set(tracksWithUnknownEnd.map {$0.source})
+        tracks = tracks.filter { $0.start != .invalid }
+        let tracksWithUnknownEnd = tracks.filter { $0.end == .invalid }
+        let sourcesNeedDuration = Set(tracksWithUnknownEnd.map { $0.source })
         let durations = try await withThrowingTaskGroup(of: (url: URL, duration: Timestamp).self) { taskGroup in
             for source in sourcesNeedDuration {
                 taskGroup.addTask {
                     let asset = AVAsset(url: source)
                     let duration = try await asset.load(.duration)
-                    return (url: source, duration: Timestamp.init(from: duration))
+                    return (url: source, duration: Timestamp(from: duration))
                 }
             }
             var durations: [URL: Timestamp] = [:]
@@ -294,20 +461,17 @@ struct CueSheetParser: FileParser {
         for track in tracksWithUnknownEnd {
             track.end = durations[track.source]!
         }
-        album.tracks = tracks
         for (i, track) in tracks.enumerated() {
-            track.trackNumber = i + 1
-            track.discNumber = discNumber
+            track.metadata[MetadataCommonKey.trackNumber] = String(i + 1)
+            track.metadata[MetadataCommonKey.discNumber] = discNumber.map { String($0) }
         }
         return (albums: [album], tracks: tracks)
     }
 }
 
-protocol Grabber {
-    func grab(tracks: [Track]) async throws
-}
+fileprivate struct FLACGrabber: MetadataGrabber {
+    let supportedTypes = [UTType("org.xiph.flac")!]
 
-struct FLACGrabber {
     struct InvalidFormat: Error {
         let url: URL
     }
@@ -317,59 +481,41 @@ struct FLACGrabber {
         return Int(data[0]) | Int(data[1] << 8) | Int(data[2] << 16) | Int(data[3] << 24)
     }
 
-    func grab(tracks: [Track]) async throws {
-        let sources = Set(tracks.map {$0.source}).filter {$0.pathExtension == "flac"}
-        let metadatas = try await withThrowingTaskGroup(of: (source: URL, metadata: Metadata).self) { taskGroup in
-            for source in sources {
-                taskGroup.addTask {
-                    var reader = AsyncReader(source.resourceBytes)
-                    if try await reader.read(count: 4) != Data([0x66, 0x4C, 0x61, 0x43]) {
-                        throw InvalidFormat(url: source)
-                    }
-                    var last = false
-                    var metadata = Metadata()
-                    repeat {
-                        let header = try await reader.readEnough(count: 4)
-                        last = (header[0] >> 7) != 0
-                        let type = header[0] & 0x7f
-                        let length = Int(header[1]) << 16 | Int(header[2]) << 8 | Int(header[3])
-                        switch type {
-                        case 4: // VORBIS_COMMENT
-                            let vendorStringLength = parse32bitIntLE(try await reader.readEnough(count: 4))
-                            let vendorString = try await reader.readEnough(count: vendorStringLength)
-                            metadata[Metadata.CommonKey.encoder] = String(data: vendorString, encoding: .utf8).map {.single($0)}
-                            let vectorLength = parse32bitIntLE(try await reader.readEnough(count: 4))
-                            var totalReadCount = 8 + vendorStringLength
-                            for _ in 0 ..< vectorLength {
-                                let commentLength = parse32bitIntLE(try await reader.readEnough(count: 4))
-                                let data = try await reader.readEnough(count: commentLength)
-                                totalReadCount += 4 + commentLength
-                                guard let comment = String(data: data, encoding: .utf8) else {
-                                    continue
-                                }
-                                let parts = comment.split(separator: "=", maxSplits: 2).map {String($0)}
-                                let (key, value) = (parts[0], parts[1])
-                                metadata[key] = .single(value)
-                            }
-                            if totalReadCount != length {
-                                throw InvalidFormat(url: source)
-                            }
-                        default:
-                            let _ = try await reader.readEnough(count: length)
-                        }
-                    } while !last
-                    return (source: source, metadata: metadata)
+    func grabMetadata(url: URL) async throws -> Metadata {
+        var reader = AsyncReader(url.resourceBytes)
+        if try await reader.read(count: 4) != Data([0x66, 0x4C, 0x61, 0x43]) {
+            throw InvalidFormat(url: url)
+        }
+        var last = false
+        var metadata = Metadata()
+        repeat {
+            let header = try await reader.readEnough(count: 4)
+            last = (header[0] >> 7) != 0
+            let type = header[0] & 0x7f
+            let length = Int(header[1]) << 16 | Int(header[2]) << 8 | Int(header[3])
+            switch type {
+            case 4: // VORBIS_COMMENT
+                let vendorStringLength = parse32bitIntLE(try await reader.readEnough(count: 4))
+                let vendorString = try await reader.readEnough(count: vendorStringLength)
+                metadata[MetadataCommonKey.encoder] = String(data: vendorString, encoding: .utf8)
+                let vectorLength = parse32bitIntLE(try await reader.readEnough(count: 4))
+                var totalReadCount = 8 + vendorStringLength
+                for _ in 0 ..< vectorLength {
+                    let commentLength = parse32bitIntLE(try await reader.readEnough(count: 4))
+                    let data = try await reader.readEnough(count: commentLength)
+                    totalReadCount += 4 + commentLength
+                    guard let comment = String(data: data, encoding: .utf8) else { continue }
+                    let parts = comment.split(separator: "=", maxSplits: 2).map { String($0) }
+                    let (key, value) = (parts[0], parts[1])
+                    metadata[key] = value
                 }
+                if totalReadCount != length {
+                    throw InvalidFormat(url: url)
+                }
+            default:
+                let _ = try await reader.readEnough(count: length)
             }
-            var metadatas = [URL: Metadata]()
-            for try await item in taskGroup {
-                metadatas[item.source] = item.metadata
-            }
-            return metadatas
-        }
-        for track in tracks {
-            guard let newMetadata = metadatas[track.source] else {continue}
-            newMetadata.mapping.forEach { (k, v) in track.extraMetadata[k] = v }
-        }
+        } while !last
+        return metadata
     }
 }

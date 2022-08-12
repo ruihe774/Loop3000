@@ -7,29 +7,56 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
+
+struct JSONDocument: FileDocument {
+    static let readableContentTypes = [UTType.json]
+
+    var content: Data
+
+    init(_ content: Data) {
+        self.content = content
+    }
+
+    init(configuration: ReadConfiguration) throws {
+        if let data = configuration.file.regularFileContents {
+            content = data
+        } else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        return FileWrapper(regularFileWithContents: content)
+    }
+}
 
 struct ContentView: View {
-    @State var testingCueSheetParser = false
+    @State var showMediaImporter = false
+    @State var showJSONExporter = false
+    var musicLibrary = MusicLibrary()
+    @State var libraryJSON: JSONDocument?
 
     var body: some View {
         VStack {
-            Button("Test CueSheetParser") {
-                testingCueSheetParser = true
+            Button("Import Media") {
+                showMediaImporter = true
             }
-                    .fileImporter(isPresented: $testingCueSheetParser, allowedContentTypes: [.data]) { result in
-                        let url = try! result.get()
-                        print(url)
-                        let parser = CueSheetParser()
-                        let grabber = FLACGrabber()
-                        Task {
-                            let v = try! await parser.parse(url: url)
-                            try! await grabber.grab(tracks: v.tracks)
-//                            let json = JSONEncoder()
-//                            json.outputFormatting = [.prettyPrinted, .withoutEscapingSlashes]
-//                            let s = String(data: try! json.encode(v.tracks), encoding: .utf8)!
-//                            print(s)
-                        }
-                    }
+            .fileImporter(isPresented: $showMediaImporter, allowedContentTypes: musicLibrary.canImportTypes) { result in
+                let url = try! result.get()
+                Task {
+                    try! await musicLibrary.importMedia(from: url)
+                }
+            }
+            Button("Export Library") {
+                let json = JSONEncoder()
+                json.outputFormatting = [.prettyPrinted, .withoutEscapingSlashes]
+                libraryJSON = JSONDocument(try! json.encode(musicLibrary))
+                showJSONExporter = true
+            }
+            .fileExporter(isPresented: $showJSONExporter, document: libraryJSON, contentType: .json) { result in
+                let _ = try! result.get()
+            }
         }
     }
 }
