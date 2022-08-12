@@ -369,6 +369,18 @@ class MusicLibrary: Codable {
             consolidatedAlbums.append(album)
         }
         albums = consolidatedAlbums
+
+        for album in albums {
+            let tracks = getTracks(for: album)
+            for (key, _) in tracks.first!.metadata {
+                if let value = commonMetadata(tracks, for: key), album.metadata[key] == nil {
+                    album.metadata[key] = value
+                    for track in tracks {
+                        track.metadata[key] = nil
+                    }
+                }
+            }
+        }
     }
 
     private func mergeTracks(_ a: Track, _ b: Track) -> Track? {
