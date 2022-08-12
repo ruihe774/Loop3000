@@ -297,7 +297,7 @@ class MusicLibrary: Codable {
         return (importedAlbums: albums, importedTracks: tracks)
     }
 
-    func discover(at url: URL, recursive: Bool = false)
+    func discover(at url: URL, recursive: Bool = false, consolidate: Bool = true)
     async throws -> (importedAlbums: [Album], importedTracks: [Track], errors: [Error]) {
         var r = (importedAlbums: [Album](), importedTracks: [Track](), errors: [Error]())
         let fileManager = FileManager.default
@@ -326,7 +326,7 @@ class MusicLibrary: Codable {
                     let isDirectory = try child.resourceValues(forKeys: [.isDirectoryKey]).isDirectory ?? false
                     if isDirectory {
                         taskGroup.addTask {
-                            try await self.discover(at: child)
+                            try await self.discover(at: child, recursive: true, consolidate: false)
                         }
                     }
                 }
@@ -337,7 +337,9 @@ class MusicLibrary: Codable {
                 }
             }
         }
-        consolidate()
+        if consolidate {
+            self.consolidate()
+        }
         return r
     }
 
