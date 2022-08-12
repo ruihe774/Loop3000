@@ -332,6 +332,7 @@ class MusicLibrary: Codable {
                 }
             }
         }
+        consolidate()
         return r
     }
 
