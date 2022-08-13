@@ -427,10 +427,8 @@ class MusicLibrary: Codable {
         guard titleA == titleB else { return nil }
         let tracksA = getTracks(for: a)
         let tracksB = getTracks(for: b)
-        let artistInAlbumA = a.metadata[MetadataCommonKey.artist]
-        let artistInAlbumB = b.metadata[MetadataCommonKey.artist]
-        let artistA = artistInAlbumA ?? commonMetadata(tracksA, for: MetadataCommonKey.artist)
-        let artistB = artistInAlbumB ?? commonMetadata(tracksB, for: MetadataCommonKey.artist)
+        let artistA = a.metadata[MetadataCommonKey.artist]
+        let artistB = b.metadata[MetadataCommonKey.artist]
         guard artistA == artistB else { return nil }
         for trackA in tracksA {
             if tracksB.contains(where: { trackB in
@@ -459,6 +457,12 @@ class MusicLibrary: Codable {
                     return true
                 }
                 guard trackA.metadata[MetadataCommonKey.organization] == trackB.metadata[MetadataCommonKey.organization] else {
+                    return true
+                }
+                guard trackA.metadata[MetadataCommonKey.date] == trackB.metadata[MetadataCommonKey.date] else {
+                    return true
+                }
+                guard trackA.metadata["YEAR"] == trackB.metadata["YEAR"] else {
                     return true
                 }
                 return false
@@ -720,8 +724,7 @@ fileprivate struct FLACGrabber: MetadataGrabber {
             let type = header[0] & 0x7f
             let length = Int(header[1]) << 16 | Int(header[2]) << 8 | Int(header[3])
             totalLength += length
-            if totalLength > 0xfffff {
-                print(url)
+            if totalLength > 0xffff {
                 break
             }
             switch type {
@@ -745,6 +748,8 @@ fileprivate struct FLACGrabber: MetadataGrabber {
                 if totalReadCount != length {
                     throw InvalidFormat(url: url)
                 }
+                // We got what we need
+                last = true
             default:
                 let _ = try await reader.readEnough(count: length)
             }
