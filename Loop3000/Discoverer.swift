@@ -385,11 +385,24 @@ class MusicLibrary: Codable {
 
         for album in albums {
             let tracks = getTracks(for: album)
+            if tracks.count < 2 { continue }
             for (key, _) in tracks.first!.metadata {
-                if let value = commonMetadata(tracks, for: key), album.metadata[key] == nil {
-                    album.metadata[key] = value
-                    for track in tracks {
-                        track.metadata[key] = nil
+                switch key {
+                case
+                    MetadataCommonKey.trackNumber,
+                    MetadataCommonKey.discNumber,
+                    MetadataCommonKey.ISRC,
+                    "TOTALDISCS",
+                    "TOTALTRACKS",
+                    "DISCTOTAL",
+                    "TRACKTOTAL":
+                    ()
+                default:
+                    if let value = commonMetadata(tracks, for: key), album.metadata[key] == nil {
+                        album.metadata[key] = value
+                        for track in tracks {
+                            track.metadata[key] = nil
+                        }
                     }
                 }
             }
@@ -421,19 +434,23 @@ class MusicLibrary: Codable {
         guard artistA == artistB else { return nil }
         for trackA in tracksA {
             if tracksB.contains(where: { trackB in
-                if trackA.metadata[MetadataCommonKey.title] == trackB.metadata[MetadataCommonKey.title] { return true }
                 if let trackNumberA = trackA.metadata[MetadataCommonKey.trackNumber].flatMap({ Int($0) }),
-                    let trackNumberB = trackB.metadata[MetadataCommonKey.trackNumber].flatMap({ Int($0) }),
-                    trackNumberA == trackNumberB {
+                   let trackNumberB = trackB.metadata[MetadataCommonKey.trackNumber].flatMap({ Int($0) }) {
+                    if trackNumberA == trackNumberB {
                         if let discNumberA = trackA.metadata[MetadataCommonKey.discNumber].flatMap({ Int($0) }),
                            let discNumberB = trackB.metadata[MetadataCommonKey.discNumber].flatMap({ Int($0) }) {
                             return discNumberA == discNumberB
                         } else {
                             return true
                         }
-                } else {
-                    return false
+                    } else {
+                        return false
+                    }
                 }
+                if trackA.metadata[MetadataCommonKey.title] == trackB.metadata[MetadataCommonKey.title] {
+                    return true
+                }
+                return false
             }) {
                 return nil
             }
