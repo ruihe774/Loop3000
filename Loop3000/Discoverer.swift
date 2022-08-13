@@ -682,11 +682,17 @@ fileprivate struct FLACGrabber: MetadataGrabber {
         }
         var last = false
         var metadata = Metadata()
+        var totalLength = 0
         repeat {
             let header = try await reader.readEnough(count: 4)
             last = (header[0] >> 7) != 0
             let type = header[0] & 0x7f
             let length = Int(header[1]) << 16 | Int(header[2]) << 8 | Int(header[3])
+            totalLength += length
+            if totalLength > 0xfffff {
+                print(url)
+                break
+            }
             switch type {
             case 4: // VORBIS_COMMENT
                 let vendorStringLength = parse32bitIntLE(try await reader.readEnough(count: 4))
