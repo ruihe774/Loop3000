@@ -60,6 +60,7 @@ class ObservableMusicLibrary: ObservableObject {
 
     init() {
         shelf = MusicLibraryActor(musicLibrary: backstore)
+        backstore.requestTracer = RequestTracer()
         
         ac.append(taskStarted
             .receive(on: DispatchQueue.main)
@@ -93,6 +94,14 @@ class ObservableMusicLibrary: ObservableObject {
         $tasks
             .map { !$0.isEmpty }
             .assign(to: &$processing)
+
+        ac.append(Timer.publish(every: 2, on: .main, in: .default)
+            .autoconnect()
+            .compactMap { [unowned self] date in self.processing ? date : nil }
+            .sink { [unowned self] _ in
+                self.requesting = self.backstore.requestTracer!.urls
+            }
+        )
     }
 
     private func perform(operation: @escaping () async throws -> [Error]) {
