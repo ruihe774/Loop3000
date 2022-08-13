@@ -338,14 +338,35 @@ class MusicLibrary: Codable {
                 guard let type = UTType(filenameExtension: url.pathExtension) else { return false }
                 return importer.supportedTypes.contains { type.conforms(to: $0) }
             }
-            for url in applicableFiles {
-                do {
-                    let item = try await self.importMedia(from: url)
-                    children.subtract(item.importedTracks.map { $0.source.absoluteURL })
-                } catch let error {
-                    r.errors.append(error)
+            let rv = await withTaskGroup(
+                of: (importedAlbums: [Album], importedTracks: [Track], errors: [Error]).self
+            ) { taskGroup in
+                for url in applicableFiles {
+                    taskGroup.addTask {
+                        var rv = (importedAlbums: [Album](), importedTracks: [Track](), errors: [Error]())
+                        do {
+                            let (albums, tracks) = try await self.importMedia(from: url)
+                            rv.importedAlbums = albums
+                            rv.importedTracks = tracks
+                        } catch let error {
+                            rv.errors = [error]
+                        }
+                        return rv
+                    }
                 }
+                var rv = (importedAlbums: [Album](), importedTracks: [Track](), errors: [Error]())
+                for await item in taskGroup {
+                    rv.importedAlbums.append(contentsOf: item.importedAlbums)
+                    rv.importedTracks.append(contentsOf: item.importedTracks)
+                    rv.errors.append(contentsOf: item.errors)
+                }
+                return rv
             }
+            r.importedAlbums.append(contentsOf: rv.importedAlbums)
+            r.importedTracks.append(contentsOf: rv.importedTracks)
+            r.errors.append(contentsOf: rv.errors)
+            children.subtract(r.importedTracks.map { $0.source.absoluteURL })
+            children.subtract(applicableFiles)
         }
         if recursive {
             try await withThrowingTaskGroup(
@@ -371,11 +392,13 @@ class MusicLibrary: Codable {
 
     func discover(at url: URL, recursive: Bool = false, consolidate: Bool = true)
     async throws -> (importedAlbums: [Album], importedTracks: [Track], errors: [Error]) {
-        let r = try await discoverInner(at: url, recursive: recursive)
+        var r = try await discoverInner(at: url, recursive: recursive)
         if consolidate {
             await withMutateQueue {
                 self.consolidate()
             }
+            r.importedAlbums.removeAll { imported in !albums.contains { imported.id == $0.id } }
+            r.importedTracks.removeAll { imported in !tracks.contains { imported.id == $0.id } }
         }
         return r
     }
