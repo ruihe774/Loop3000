@@ -36,9 +36,11 @@ struct DiscoverView: View {
 
     private func dedup(_ urls: [URL]) -> [URL] {
         var uniques: [URL] = []
+        var met: Set<URL> = []
         for url in urls {
-            if !uniques.contains(where: { $0.id == url.id }) {
+            if !met.contains(url) {
                 uniques.append(url)
+                met.insert(url)
             }
         }
         return uniques
