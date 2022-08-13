@@ -232,6 +232,13 @@ class MusicLibrary: Codable {
     var albums = [Album]()
     var tracks = [Track]()
 
+    enum CodingKeys: CodingKey {
+        case albums
+        case tracks
+    }
+
+    let mutateQueue = DispatchQueue(label: "MusicLibrary.mutateQueue")
+
     struct NoApplicableImporter: Error {
         let url: URL
     }
@@ -291,8 +298,10 @@ class MusicLibrary: Codable {
             }
         }
 
-        self.albums.append(contentsOf: albums)
-        self.tracks.append(contentsOf: tracks)
+        mutateQueue.sync {
+            self.albums = self.albums + albums
+            self.tracks = self.tracks + tracks
+        }
 
         return (importedAlbums: albums, importedTracks: tracks)
     }
@@ -338,7 +347,9 @@ class MusicLibrary: Codable {
             }
         }
         if consolidate {
-            self.consolidate()
+            mutateQueue.sync {
+                self.consolidate()
+            }
         }
         return r
     }
