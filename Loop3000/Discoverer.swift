@@ -452,6 +452,9 @@ class MusicLibrary: Codable {
         let selected = a.id < b.id ? a : b
         let abandoned = selected.id == a.id ? b : a
         selected.metadata.merge(abandoned.metadata) { (cur, _) in cur }
+        for track in getTracks(for: abandoned) {
+            track.albumId = selected.id
+        }
         return selected
     }
 
