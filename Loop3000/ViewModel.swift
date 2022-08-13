@@ -47,15 +47,16 @@ class ObservableMusicLibrary: ObservableObject {
     @Published private(set) var albums: [Album] = []
     @Published private(set) var tracks: [Track] = []
     @Published private(set) var processing = false
+    @Published private(set) var requesting: [URL] = []
     @Published private(set) var thrownError: Error?
     @Published private(set) var returnedErrors: [Error] = []
 
     @Published private var tasks = Set<UUID>()
 
-    private var taskStarted = PassthroughSubject<UUID, Never>()
-    private var taskFinished = PassthroughSubject<(taskId: UUID, thrownError: Error?, returnedErrors: [Error]), Never>()
+    private let taskStarted = PassthroughSubject<UUID, Never>()
+    private let taskFinished = PassthroughSubject<(taskId: UUID, thrownError: Error?, returnedErrors: [Error]), Never>()
 
-    private var ac: [AnyCancellable] = []
+    private var ac: [any Cancellable] = []
 
     init() {
         shelf = MusicLibraryActor(musicLibrary: backstore)
@@ -90,8 +91,7 @@ class ObservableMusicLibrary: ObservableObject {
             .assign(to: &$tracks)
 
         $tasks
-            .count()
-            .map { $0 != 0 }
+            .map { !$0.isEmpty }
             .assign(to: &$processing)
     }
 
@@ -153,7 +153,11 @@ class ViewModel: ObservableObject {
     private var ac: [AnyCancellable] = []
 
     init() {
-        ac.append(musicLibrary.objectWillChange.sink { [unowned self] _ in self.objectWillChange.send() })
+        ac.append(musicLibrary
+            .objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [unowned self] _ in self.objectWillChange.send() }
+        )
     }
 
     func alert(title: String, message: String) {
