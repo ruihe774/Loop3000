@@ -8,21 +8,23 @@
 
 /* Begin PBXBuildFile section */
 		661B751628A47C9900B9C012 /* Discoverer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 661B751528A47C9800B9C012 /* Discoverer.swift */; };
-		669C586128A47B4D0038A986 /* Loop3000App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 669C586028A47B4D0038A986 /* Loop3000App.swift */; };
-		669C586328A47B4D0038A986 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 669C586228A47B4D0038A986 /* ContentView.swift */; };
+		66684C7628A7C28800C32BC8 /* ViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66684C7528A7C28800C32BC8 /* ViewModel.swift */; };
+		66684C7828A7FC6700C32BC8 /* DiscoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66684C7728A7FC6700C32BC8 /* DiscoverView.swift */; };
+		669C586128A47B4D0038A986 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 669C586028A47B4D0038A986 /* App.swift */; };
+		669C586328A47B4D0038A986 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 669C586228A47B4D0038A986 /* MainView.swift */; };
 		669C586528A47B4E0038A986 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 669C586428A47B4E0038A986 /* Assets.xcassets */; };
-		669C586828A47B4E0038A986 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 669C586728A47B4E0038A986 /* Preview Assets.xcassets */; };
 		66E77E5528A54CA400FE6C1E /* AsyncReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66E77E5428A54CA300FE6C1E /* AsyncReader.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		661B751528A47C9800B9C012 /* Discoverer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Discoverer.swift; sourceTree = "<group>"; };
+		66684C7528A7C28800C32BC8 /* ViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewModel.swift; sourceTree = "<group>"; };
+		66684C7728A7FC6700C32BC8 /* DiscoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverView.swift; sourceTree = "<group>"; };
 		66732F6E28A63F400089682A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		669C585D28A47B4D0038A986 /* Loop3000.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Loop3000.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		669C586028A47B4D0038A986 /* Loop3000App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Loop3000App.swift; sourceTree = "<group>"; };
-		669C586228A47B4D0038A986 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		669C586028A47B4D0038A986 /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
+		669C586228A47B4D0038A986 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		669C586428A47B4E0038A986 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		669C586728A47B4E0038A986 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		669C586928A47B4E0038A986 /* Loop3000.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Loop3000.entitlements; sourceTree = "<group>"; };
 		66E77E5428A54CA300FE6C1E /* AsyncReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AsyncReader.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -59,22 +61,15 @@
 			children = (
 				66732F6E28A63F400089682A /* Info.plist */,
 				661B751528A47C9800B9C012 /* Discoverer.swift */,
-				669C586028A47B4D0038A986 /* Loop3000App.swift */,
-				669C586228A47B4D0038A986 /* ContentView.swift */,
+				669C586028A47B4D0038A986 /* App.swift */,
+				669C586228A47B4D0038A986 /* MainView.swift */,
 				669C586428A47B4E0038A986 /* Assets.xcassets */,
 				669C586928A47B4E0038A986 /* Loop3000.entitlements */,
-				669C586628A47B4E0038A986 /* Preview Content */,
 				66E77E5428A54CA300FE6C1E /* AsyncReader.swift */,
+				66684C7528A7C28800C32BC8 /* ViewModel.swift */,
+				66684C7728A7FC6700C32BC8 /* DiscoverView.swift */,
 			);
 			path = Loop3000;
-			sourceTree = "<group>";
-		};
-		669C586628A47B4E0038A986 /* Preview Content */ = {
-			isa = PBXGroup;
-			children = (
-				669C586728A47B4E0038A986 /* Preview Assets.xcassets */,
-			);
-			path = "Preview Content";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -135,7 +130,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				669C586828A47B4E0038A986 /* Preview Assets.xcassets in Resources */,
 				669C586528A47B4E0038A986 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -147,10 +141,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				669C586328A47B4D0038A986 /* ContentView.swift in Sources */,
+				66684C7628A7C28800C32BC8 /* ViewModel.swift in Sources */,
+				669C586328A47B4D0038A986 /* MainView.swift in Sources */,
 				66E77E5528A54CA400FE6C1E /* AsyncReader.swift in Sources */,
 				661B751628A47C9900B9C012 /* Discoverer.swift in Sources */,
-				669C586128A47B4D0038A986 /* Loop3000App.swift in Sources */,
+				669C586128A47B4D0038A986 /* App.swift in Sources */,
+				66684C7828A7FC6700C32BC8 /* DiscoverView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -279,7 +275,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"Loop3000/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Loop3000/Info.plist;
@@ -305,7 +301,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"Loop3000/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Loop3000/Info.plist;

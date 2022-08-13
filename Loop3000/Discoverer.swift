@@ -218,15 +218,15 @@ fileprivate extension Array where Element: Identifiable {
 }
 
 class MusicLibrary: Codable {
-    static var mediaImporters: [any MediaImporter] = [CueSheetImporter(), AVImporter()]
-    static var metadataGrabbers: [any MetadataGrabber] = [FLACGrabber(), AVGrabber()]
+    var mediaImporters: [any MediaImporter] = [CueSheetImporter(), AVImporter()]
+    var metadataGrabbers: [any MetadataGrabber] = [FLACGrabber(), AVGrabber()]
 
     var canImportTypes: [UTType] {
-        Self.mediaImporters.flatMap { $0.supportedTypes }
+        mediaImporters.flatMap { $0.supportedTypes }
     }
 
     var canGrabTypes: [UTType] {
-        Self.metadataGrabbers.flatMap { $0.supportedTypes }
+        metadataGrabbers.flatMap { $0.supportedTypes }
     }
 
     var albums = [Album]()
@@ -237,7 +237,17 @@ class MusicLibrary: Codable {
         case tracks
     }
 
-    let mutateQueue = DispatchQueue(label: "MusicLibrary.mutateQueue")
+    private let mutateQueue = DispatchQueue(label: "MusicLibrary.mutateQueue")
+    var urlSession: URLSession = URLSession.shared {
+        didSet(newValue) {
+            for var importer in mediaImporters {
+                importer.urlSession = newValue
+            }
+            for var grabber in metadataGrabbers {
+                grabber.urlSession = newValue
+            }
+        }
+    }
 
     struct NoApplicableImporter: Error {
         let url: URL
@@ -260,7 +270,7 @@ class MusicLibrary: Codable {
         guard let type = UTType(filenameExtension: url.pathExtension) else {
             throw NoApplicableImporter(url: url)
         }
-        guard let importer = Self.mediaImporters.first(where: { importer in
+        guard let importer = mediaImporters.first(where: { importer in
             importer.supportedTypes.contains { type.conforms(to: $0) }
         }) else {
             throw NoApplicableImporter(url: url)
@@ -274,7 +284,7 @@ class MusicLibrary: Codable {
                 guard let type = UTType(filenameExtension: source.pathExtension) else {
                     continue
                 }
-                guard let grabber = Self.metadataGrabbers.first(where: { grabber in
+                guard let grabber = metadataGrabbers.first(where: { grabber in
                     grabber.supportedTypes.contains { type.conforms(to: $0) }
                 }) else {
                     continue
@@ -322,7 +332,7 @@ class MusicLibrary: Codable {
         var children = Set(try fileManager.contentsOfDirectory(
             at: url, includingPropertiesForKeys: [.isDirectoryKey], options: .skipsHiddenFiles
         ).map { $0.absoluteURL })
-        for importer in Self.mediaImporters {
+        for importer in mediaImporters {
             let applicableFiles = children.filter { url in
                 guard let type = UTType(filenameExtension: url.pathExtension) else { return false }
                 return importer.supportedTypes.contains { type.conforms(to: $0) }
@@ -515,12 +525,14 @@ class MusicLibrary: Codable {
 
 protocol MediaImporter {
     var supportedTypes: [UTType] { get }
+    var urlSession: URLSession { get set }
 
     func importMedia(url: URL) async throws -> (albums: [Album], tracks: [Track])
 }
 
 protocol MetadataGrabber {
     var supportedTypes: [UTType] { get }
+    var urlSession: URLSession { get set }
 
     func grabMetadata(url: URL) async throws -> Metadata
 }
@@ -538,6 +550,7 @@ fileprivate extension URL {
 
 fileprivate struct CueSheetImporter: MediaImporter {
     let supportedTypes = [UTType("io.misakikasumi.Loop3000.CueSheet")!]
+    var urlSession = URLSession.shared
 
     private static let linePartRegex = /(".+?"|.+?)\s+/
 
@@ -554,7 +567,7 @@ fileprivate struct CueSheetImporter: MediaImporter {
     }
 
     private func loadContent(from url: URL) async throws -> String {
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await urlSession.data(from: url)
         let encodingValue = response.textEncodingName
                 .map { $0 as CFString }
                 .map { CFStringConvertIANACharSetNameToEncoding($0) }
@@ -680,6 +693,8 @@ fileprivate struct CueSheetImporter: MediaImporter {
             for source in sourcesNeedDuration {
                 taskGroup.addTask {
                     let asset = AVAsset(url: source)
+                    let trace = urlSession.dataTask(with: url)
+                    trace.suspend()
                     let duration = try await asset.load(.duration)
                     return (url: source, duration: Timestamp(from: duration))
                 }
@@ -703,9 +718,12 @@ fileprivate struct CueSheetImporter: MediaImporter {
 
 fileprivate struct AVImporter: MediaImporter {
     let supportedTypes = [UTType.audio]
+    var urlSession = URLSession.shared
 
     func importMedia(url: URL) async throws -> (albums: [Album], tracks: [Track]) {
         let asset = AVAsset(url: url)
+        let trace = urlSession.dataTask(with: url)
+        trace.suspend()
         let duration = try await asset.load(.duration)
         let album = Album()
         let track = Track(source: url, start: .zero, end: Timestamp(from: duration), albumId: album.id)
@@ -715,6 +733,7 @@ fileprivate struct AVImporter: MediaImporter {
 
 fileprivate struct FLACGrabber: MetadataGrabber {
     let supportedTypes = [UTType("org.xiph.flac")!]
+    var urlSession = URLSession.shared
 
     struct InvalidFormat: Error {
         let url: URL
@@ -726,7 +745,7 @@ fileprivate struct FLACGrabber: MetadataGrabber {
     }
 
     func grabMetadata(url: URL) async throws -> Metadata {
-        var reader = AsyncReader(url.resourceBytes)
+        var reader = AsyncReader(try await urlSession.bytes(from: url).0)
         if try await reader.read(count: 4) != Data([0x66, 0x4C, 0x61, 0x43]) {
             throw InvalidFormat(url: url)
         }
@@ -775,6 +794,7 @@ fileprivate struct FLACGrabber: MetadataGrabber {
 
 fileprivate struct AVGrabber: MetadataGrabber {
     let supportedTypes = [UTType.audio]
+    var urlSession = URLSession.shared
 
     private static let keyMapping: [AVMetadataKey: String] = [
         .commonKeyAlbumName: MetadataCommonKey.album,
@@ -791,7 +811,9 @@ fileprivate struct AVGrabber: MetadataGrabber {
     ]
 
     func grabMetadata(url: URL) async throws -> Metadata {
-        let asset = AVAsset(url: url)
+        let asset = AVURLAsset(url: url)
+        let trace = urlSession.dataTask(with: url)
+        trace.suspend()
         let avMetadata = try await asset.load(.metadata)
         var metadata = Metadata()
         for item in avMetadata {
