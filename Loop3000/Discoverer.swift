@@ -247,6 +247,15 @@ class MusicLibrary: Codable {
         let url: URL
     }
 
+    private func withMutateQueue(_ f: @escaping () -> ()) async {
+        await withCheckedContinuation { continuation in
+            mutateQueue.async {
+                f()
+                continuation.resume()
+            }
+        }
+    }
+
     func importMedia(from url: URL) async throws -> (importedAlbums: [Album], importedTracks: [Track]) {
         guard let type = UTType(filenameExtension: url.pathExtension) else {
             throw NoApplicableImporter(url: url)
@@ -298,7 +307,7 @@ class MusicLibrary: Codable {
             }
         }
 
-        mutateQueue.sync {
+        await withMutateQueue {
             self.albums = self.albums + albums
             self.tracks = self.tracks + tracks
         }
@@ -347,7 +356,7 @@ class MusicLibrary: Codable {
             }
         }
         if consolidate {
-            mutateQueue.sync {
+            await withMutateQueue {
                 self.consolidate()
             }
         }
