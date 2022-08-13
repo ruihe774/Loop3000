@@ -22,7 +22,7 @@ struct Loop3000App: App {
         }
         .commands {
             CommandMenu("Library") {
-                Button("Add File…") {
+                Button("Add File") {
                     model.libraryCommands.showFileAdder = true
                 }
                 .keyboardShortcut("a", modifiers: [.command, .option])
@@ -38,7 +38,7 @@ struct Loop3000App: App {
                         model.alert(title: "Add File", message: "Please use “Add Folder” to add the whole album.")
                     }
                 }
-                Button("Add Folder…") {
+                Button("Add Folder") {
                     model.libraryCommands.showFolderAdder = true
                 }
                 .fileImporter(
@@ -47,7 +47,7 @@ struct Loop3000App: App {
                 ) { result in
                     (try? result.get()).map { musicLibrary.performDiscover(at: $0, recursive: false) }
                 }
-                Button("Discover…") {
+                Button("Discover") {
                     model.libraryCommands.showDiscoverer = true
                 }
                 .keyboardShortcut("d", modifiers: [.command, .option])
