@@ -58,6 +58,21 @@ struct Loop3000App: App {
                 ) { result in
                     (try? result.get()).map { musicLibrary.performDiscover(at: $0, recursive: true) }
                 }
+                Divider()
+                Button("Consolidate") {
+                    model.musicLibrary.performConsolidate()
+                }
+                Divider()
+                Button("Import Library") {
+                    model.libraryCommands.importLibrary = true
+                }
+                .fileImporter(isPresented: $model.libraryCommands.importLibrary, allowedContentTypes: [.json]) { result in
+                    guard let url = try? result.get() else { return }
+                    model.musicLibrary.performInputLibrary(from: url)
+                }
+                Button("Export Library") {
+                    model.libraryCommands.exportLibary = true
+                }
             }
         }
     }

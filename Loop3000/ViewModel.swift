@@ -18,6 +18,14 @@ fileprivate actor MusicLibraryActor {
         try await musicLibrary.discover(at: url, recursive: recursive, consolidate: consolidate)
     }
 
+    func consolidate() {
+        musicLibrary.consolidate()
+    }
+
+    func importLibrary(from data: Data) throws {
+        try musicLibrary.importLibrary(from: data)
+    }
+
     var albums: [Album] {
         musicLibrary.albums
     }
@@ -157,6 +165,21 @@ class ObservableMusicLibrary: ObservableObject {
         backstore.getTracks(for: album)
     }
 
+    func performConsolidate() {
+        perform {
+            await self.shelf.consolidate()
+            return []
+        }
+    }
+
+    func performInputLibrary(from url: URL) {
+        perform {
+            let data = try await URLSession.shared.data(from: url).0
+            try await self.shelf.importLibrary(from: data)
+            return []
+        }
+    }
+
     var canImportTypes: [UTType] {
         self.backstore.canImportTypes
     }
@@ -170,6 +193,9 @@ struct LibraryCommands {
     var showFileAdder = false
     var showFolderAdder = false
     var showDiscoverer = false
+    var consolidate = false
+    var importLibrary = false
+    var exportLibary = false
 }
 
 struct AlertModel {
@@ -184,12 +210,24 @@ enum ShowView {
     case Stub
 }
 
+enum SidebarList {
+    case Albums
+    case Playlists
+}
+
+struct SidebarModel {
+    var currentList = SidebarList.Playlists
+    var selected: UUID?
+}
+
 class ViewModel: ObservableObject {
     @Published var musicLibrary = ObservableMusicLibrary()
     @Published var libraryCommands = LibraryCommands()
     @Published var alertModel = AlertModel()
 
     @Published var currentView = ShowView.Stub
+
+    @Published var sidebarModel = SidebarModel()
 
     private var ac: [AnyCancellable] = []
 
@@ -200,12 +238,16 @@ class ViewModel: ObservableObject {
             .sink { [unowned self] _ in self.objectWillChange.send() }
         )
 
-        musicLibrary.$processing
-            .compactMap { $0 ? .Discover : nil }
-            .assign(to: &$currentView)
-
-        Publishers.CombineLatest(musicLibrary.$importedAlbums, musicLibrary.$importedTracks)
-            .map { item in item.0 != nil && item.1 != nil ? .DiscoverFinish : .Stub }
+        Publishers.CombineLatest3(musicLibrary.$processing, musicLibrary.$importedAlbums, musicLibrary.$importedTracks)
+            .map { (processing, importedAlbums, importedTracks) in
+                if processing {
+                    return .Discover
+                }
+                if importedAlbums != nil && importedTracks != nil {
+                    return .DiscoverFinish
+                }
+                return .Stub
+            }
             .assign(to: &$currentView)
     }
 

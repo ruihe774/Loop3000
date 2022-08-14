@@ -545,6 +545,22 @@ class MusicLibrary: Codable {
     func getTracks(for album: Album) -> [Track] {
         tracks.filter { $0.albumId == album.id }
     }
+
+    func importLibrary(from data: Data) throws {
+        let json = JSONDecoder()
+        let importedLibrary = try json.decode(Self.self, from: data)
+        for album in importedLibrary.albums {
+            if !albums.contains(where: { album.id == $0.id }) {
+                albums.append(album)
+            }
+        }
+        for track in importedLibrary.tracks {
+            if !tracks.contains(where: { track.id == $0.id }) {
+                tracks.append(track)
+            }
+        }
+        consolidate()
+    }
 }
 
 protocol MediaImporter: AnyObject {
