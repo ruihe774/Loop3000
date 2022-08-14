@@ -19,10 +19,11 @@ struct DiscoverView: View {
                 .padding()
             Divider()
             List(dedup(model.musicLibrary.requesting)) { url in
+                let text = url.isFileURL ? url.path : url.absoluteString
                 HStack(spacing: 8) {
                     ProgressView().scaleEffect(0.5)
-                    Text(url.isFileURL ? url.path : url.absoluteString)
-                        .help(url.isFileURL ? url.path : url.absoluteString)
+                    Text(text)
+                        .help(text)
                         .scaledToFit()
                 }
                 .frame(height: 16)

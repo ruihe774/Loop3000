@@ -13,13 +13,14 @@ struct Loop3000App: App {
             MainView()
             .environmentObject(model)
             .alert(model.alertModel.title, isPresented: $model.alertModel.isPresented) {
-                Button("OK") {
-                }
+                Button("OK") {}
                 .keyboardShortcut(.defaultAction)
             } message: {
                 Text(model.alertModel.message)
             }
+            .edgesIgnoringSafeArea(.all)
         }
+        .windowStyle(.hiddenTitleBar)
         .commands {
             CommandMenu("Library") {
                 Button("Add File") {

@@ -14,6 +14,7 @@
 		669C586128A47B4D0038A986 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 669C586028A47B4D0038A986 /* App.swift */; };
 		669C586328A47B4D0038A986 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 669C586228A47B4D0038A986 /* MainView.swift */; };
 		669C586528A47B4E0038A986 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 669C586428A47B4E0038A986 /* Assets.xcassets */; };
+		66A9A01028A8D01C004BBE6C /* DiscoverFinishView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66A9A00F28A8D01C004BBE6C /* DiscoverFinishView.swift */; };
 		66E77E5528A54CA400FE6C1E /* AsyncReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66E77E5428A54CA300FE6C1E /* AsyncReader.swift */; };
 /* End PBXBuildFile section */
 
@@ -28,6 +29,7 @@
 		669C586228A47B4D0038A986 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		669C586428A47B4E0038A986 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		669C586928A47B4E0038A986 /* Loop3000.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Loop3000.entitlements; sourceTree = "<group>"; };
+		66A9A00F28A8D01C004BBE6C /* DiscoverFinishView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverFinishView.swift; sourceTree = "<group>"; };
 		66E77E5428A54CA300FE6C1E /* AsyncReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AsyncReader.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -71,6 +73,7 @@
 				66684C7528A7C28800C32BC8 /* ViewModel.swift */,
 				66684C7728A7FC6700C32BC8 /* DiscoverView.swift */,
 				66684C7B28A823A500C32BC8 /* Sidebar.swift */,
+				66A9A00F28A8D01C004BBE6C /* DiscoverFinishView.swift */,
 			);
 			path = Loop3000;
 			sourceTree = "<group>";
@@ -150,6 +153,7 @@
 				661B751628A47C9900B9C012 /* Discoverer.swift in Sources */,
 				669C586128A47B4D0038A986 /* App.swift in Sources */,
 				66684C7C28A823A500C32BC8 /* Sidebar.swift in Sources */,
+				66A9A01028A8D01C004BBE6C /* DiscoverFinishView.swift in Sources */,
 				66684C7828A7FC6700C32BC8 /* DiscoverView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

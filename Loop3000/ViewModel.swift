@@ -50,11 +50,14 @@ class ObservableMusicLibrary: ObservableObject {
     @Published private(set) var requesting: [URL] = []
     @Published private(set) var thrownError: Error?
     @Published private(set) var returnedErrors: [Error] = []
+    @Published private(set) var importedAlbums: [Album]?
+    @Published private(set) var importedTracks: [Track]?
 
     @Published private var tasks = Set<UUID>()
 
     private let taskStarted = PassthroughSubject<UUID, Never>()
     private let taskFinished = PassthroughSubject<(taskId: UUID, thrownError: Error?, returnedErrors: [Error]), Never>()
+    private let discovered = PassthroughSubject<(importedAlbums: [Album], importedTracks: [Track]), Never>()
 
     private var ac: [any Cancellable] = []
 
@@ -95,6 +98,16 @@ class ObservableMusicLibrary: ObservableObject {
             .map { !$0.isEmpty }
             .assign(to: &$processing)
 
+        discovered
+            .receive(on: DispatchQueue.main)
+            .map { ( importedAlbums, _) in importedAlbums }
+            .assign(to: &$importedAlbums)
+
+        discovered
+            .receive(on: DispatchQueue.main)
+            .map { (_, importedTracks) in importedTracks }
+            .assign(to: &$importedTracks)
+
         ac.append(Timer.publish(every: 2, on: .main, in: .default)
             .autoconnect()
             .compactMap { [unowned self] date in self.processing ? date : nil }
@@ -121,7 +134,8 @@ class ObservableMusicLibrary: ObservableObject {
 
     func performImportMedia(from url: URL) {
         perform {
-            let _ = try await self.shelf.importMedia(from: url)
+            let r = try await self.shelf.importMedia(from: url)
+            self.discovered.send(r)
             return []
         }
     }
@@ -129,8 +143,18 @@ class ObservableMusicLibrary: ObservableObject {
     func performDiscover(at url: URL, recursive: Bool = false, consolidate: Bool = true) {
         perform {
             let r = try await self.shelf.discover(at: url, recursive: recursive, consolidate: consolidate)
+            self.discovered.send((importedAlbums: r.importedAlbums, importedTracks: r.importedTracks))
             return r.errors
         }
+    }
+
+    func clearResult() {
+        importedAlbums = nil
+        importedTracks = nil
+    }
+
+    func getTracks(for album: Album) -> [Track] {
+        backstore.getTracks(for: album)
     }
 
     var canImportTypes: [UTType] {
@@ -154,10 +178,18 @@ struct AlertModel {
     var message = ""
 }
 
+enum ShowView {
+    case Discover
+    case DiscoverFinish
+    case Stub
+}
+
 class ViewModel: ObservableObject {
     @Published var musicLibrary = ObservableMusicLibrary()
     @Published var libraryCommands = LibraryCommands()
     @Published var alertModel = AlertModel()
+
+    @Published var currentView = ShowView.Stub
 
     private var ac: [AnyCancellable] = []
 
@@ -167,6 +199,14 @@ class ViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [unowned self] _ in self.objectWillChange.send() }
         )
+
+        musicLibrary.$processing
+            .compactMap { $0 ? .Discover : nil }
+            .assign(to: &$currentView)
+
+        Publishers.CombineLatest(musicLibrary.$importedAlbums, musicLibrary.$importedTracks)
+            .map { item in item.0 != nil && item.1 != nil ? .DiscoverFinish : .Stub }
+            .assign(to: &$currentView)
     }
 
     func alert(title: String, message: String) {

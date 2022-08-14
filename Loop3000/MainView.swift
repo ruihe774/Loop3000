@@ -16,10 +16,16 @@ struct MainView: View {
         HStack(spacing: 0) {
             Sidebar()
             ZStack {
-                Rectangle().background(WindowBackgrounMaterial()).foregroundColor(.clear).shadow(radius: 1)
-                if model.musicLibrary.processing {
+                Rectangle()
+                    .background(WindowBackgrounMaterial())
+                    .foregroundColor(.clear)
+                    .shadow(radius: 1)
+                switch (model.currentView) {
+                case .Discover:
                     DiscoverView()
-                } else {
+                case .DiscoverFinish:
+                    DiscoverFinishView()
+                case .Stub:
                     Spacer()
                 }
             }
