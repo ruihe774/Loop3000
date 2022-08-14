@@ -111,7 +111,7 @@ struct PlayItemView: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 4)
-                .fill(selected ? Color.primary.opacity(0.2) : Color.black.opacity(0.001))
+                .fill(selected ? Color.primary.opacity(0.1) : Color.black.opacity(0.001))
                 .cornerRadius(5)
             HStack {
                 Image(systemName: "play.fill")

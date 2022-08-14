@@ -142,7 +142,7 @@ class ObservableMusicLibrary: ObservableObject {
             .map { [unowned self] albums in
                 self.sorted(albums: albums).map { album in
                     let tracks = self.getTracks(for: album)
-                    let items = tracks.map { track in PlayItem(track: track, album: album) }
+                    let items = self.sorted(tracks: tracks).map { track in PlayItem(track: track, album: album) }
                     return Playlist(id: album.id, title: album.title ?? "<No Title>", items: items)
                 }
             }
