@@ -39,48 +39,46 @@ struct Sidebar: View {
                 .padding(.bottom, 10)
             HStack(spacing: 15) {
                 Button {
-                    model.sidebarModel.currentList = .Albums
+                    model.sidebarListType = .Albums
                 } label: {
-                    Image(systemName: model.sidebarModel.currentList == .Albums ? "opticaldisc.fill" : "opticaldisc")
+                    Image(systemName: model.sidebarListType == .Albums ? "opticaldisc.fill" : "opticaldisc")
                 }
                 .help("Albums")
-                .foregroundColor(model.sidebarModel.currentList == .Albums ? .accentColor : .secondary)
+                .foregroundColor(model.sidebarListType == .Albums ? .accentColor : .secondary)
                 .buttonStyle(.borderless)
                 Button {
-                    model.sidebarModel.currentList = .Playlists
+                    model.sidebarListType = .Playlists
                 } label: {
                     Image(systemName: "music.note.list")
                 }
                 .help("Playlists")
-                .foregroundColor(model.sidebarModel.currentList == .Playlists ? .accentColor : .secondary)
+                .foregroundColor(model.sidebarListType == .Playlists ? .accentColor : .secondary)
                 .buttonStyle(.borderless)
             }
             .font(.title2)
-            if model.sidebarModel.currentList == .Albums {
-                ScrollView {
-                    LazyVStack(spacing: -4) {
-                        ForEach(model.musicLibrary.albums.filter { $0.title != nil }) {album in
-                            let selected = model.sidebarModel.selected == album.id
-                            Button {
-                                model.sidebarModel.selected = album.id
-                            } label: {
-                                HStack {
-                                    Text(album.title!)
-                                        .foregroundColor(.primary)
-                                        .scaledToFit()
-                                    Spacer()
-                                }
+            ScrollView {
+                LazyVStack(spacing: -4) {
+                    ForEach(
+                        model.sidebarListType == .Albums ? model.musicLibrary.albumPlaylists : model.musicLibrary.manualPlaylists
+                    ) {playlist in
+                        let selected = model.selectedList == playlist.id
+                        Button {
+                            model.selectedList = playlist.id
+                        } label: {
+                            HStack {
+                                Text(playlist.title)
+                                    .foregroundColor(.primary)
+                                    .scaledToFit()
+                                Spacer()
                             }
-                            .buttonStyle(.borderless)
-                            .padding(8)
-                            .background(selected ? Color.primary.opacity(0.2) : .clear)
-                            .cornerRadius(8)
                         }
+                        .buttonStyle(.borderless)
+                        .padding(8)
+                        .background(selected ? Color.primary.opacity(0.2) : .clear)
+                        .cornerRadius(8)
                     }
-                    .scrollContentBackground(.hidden)
                 }
-            } else {
-                Spacer()
+                .scrollContentBackground(.hidden)
             }
         }
         .scenePadding([.leading, .trailing])

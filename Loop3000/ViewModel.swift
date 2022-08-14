@@ -2,6 +2,18 @@ import Foundation
 import Combine
 import UniformTypeIdentifiers
 
+class Playlist: Identifiable {
+    let id: UUID
+    var title: String
+    var items: [PlayItem]
+
+    init(id: UUID = UUID(), title: String, items: [PlayItem]) {
+        self.id = id
+        self.title = title
+        self.items = items
+    }
+}
+
 fileprivate actor MusicLibraryActor {
     private let musicLibrary: MusicLibrary
 
@@ -54,6 +66,8 @@ class ObservableMusicLibrary: ObservableObject {
 
     @Published private(set) var albums: [Album] = []
     @Published private(set) var tracks: [Track] = []
+    @Published private(set) var albumPlaylists: [Playlist] = []
+    @Published private(set) var manualPlaylists: [Playlist] = []
     @Published private(set) var processing = false
     @Published private(set) var requesting: [URL] = []
     @Published private(set) var thrownError: Error?
@@ -123,9 +137,20 @@ class ObservableMusicLibrary: ObservableObject {
                 self.requesting = self.backstore.requestTracer!.urls
             }
         )
+
+        $albums
+            .map { [unowned self] albums in
+                self.sorted(albums: albums).map { album in
+                    let tracks = self.getTracks(for: album)
+                    let items = tracks.map { track in PlayItem(track: track, album: album) }
+                    return Playlist(id: album.id, title: album.title ?? "<No Title>", items: items)
+                }
+            }
+            .assign(to: &$albumPlaylists)
     }
 
     private func perform(operation: @escaping () async throws -> [Error]) {
+        clearResult()
         let taskId = UUID()
         taskStarted.send(taskId)
         Task {
@@ -195,6 +220,14 @@ class ObservableMusicLibrary: ObservableObject {
     func sorted(tracks: [Track]) -> [Track] {
         self.backstore.sorted(tracks: tracks)
     }
+
+    func sorted(albums: [Album]) -> [Album] {
+        self.backstore.sorted(albums: albums)
+    }
+
+    func getPlaylist(id: UUID) -> Playlist {
+        return (albumPlaylists.first { $0.id == id } ?? manualPlaylists.first { $0.id == id })!
+    }
 }
 
 struct LibraryCommands {
@@ -214,16 +247,16 @@ struct AlertModel {
 
 enum ShowView {
     case Discover
+    case Playlist
     case Stub
 }
 
-enum SidebarList {
+enum SidebarListType {
     case Albums
     case Playlists
 }
 
 struct SidebarModel {
-    var currentList = SidebarList.Albums
     var selected: UUID?
 }
 
@@ -246,9 +279,14 @@ class ViewModel: ObservableObject {
     @Published var currentView = ShowView.Stub
     @Published var previousView: ShowView?
 
-    @Published var sidebarModel = SidebarModel()
+    @Published var sidebarListType = SidebarListType.Albums
 
-    private var ac: [AnyCancellable] = []
+    @Published var selectedList: UUID?
+    @Published var playingList: UUID?
+    @Published var selectedItem: UUID?
+    @Published var playingItem: UUID?
+
+    private var ac: [any Cancellable] = []
 
     init() {
         ac.append(musicLibrary
@@ -265,6 +303,13 @@ class ViewModel: ObservableObject {
         musicLibrary.$processing
             .compactMap { $0 ? .Discover : nil }
             .assign(to: &$currentView)
+
+        $selectedList
+            .compactMap { $0 != nil ? .Playlist : nil }
+            .assign(to: &$currentView)
+
+        $playingItem
+            .assign(to: &$selectedItem)
     }
 
     func alert(title: String, message: String) {

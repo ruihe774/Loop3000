@@ -11,6 +11,8 @@ struct WindowBackgrounMaterial: NSViewRepresentable {
 
 struct MainView: View {
     @EnvironmentObject var model: ViewModel
+
+    
     
     var body: some View {
         HStack(spacing: 0) {
@@ -20,11 +22,20 @@ struct MainView: View {
                     .background(WindowBackgrounMaterial())
                     .foregroundColor(.clear)
                     .shadow(radius: 1)
-                switch (model.currentView) {
-                case .Discover:
-                    DiscoverView()
-                case .Stub:
-                    Spacer()
+                VStack(spacing: 0) {
+                    PlayerView()
+                    Divider()
+                    switch (model.currentView) {
+                    case .Discover:
+                        DiscoverView()
+                    case .Playlist:
+                        PlaylistView(model.selectedList!)
+                    case .Stub:
+                        Spacer()
+                        Text("Enjoy your music")
+                            .foregroundColor(.secondary)
+                        Spacer()
+                    }
                 }
             }
         }

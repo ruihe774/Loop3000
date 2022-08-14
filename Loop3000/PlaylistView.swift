@@ -96,20 +96,45 @@ struct PlayItemView: View {
 
     var playItem: PlayItem
 
+    var selected: Bool {
+        model.selectedItem == playItem.id
+    }
+
+    var playing: Bool {
+        model.playingItem == playItem.id
+    }
+
     init(_ playItem: PlayItem) {
         self.playItem = playItem
     }
 
     var body: some View {
-        HStack {
-            Text(playItem.indexString ?? "")
-                .font(.body.monospacedDigit())
-                .frame(width: 50)
-            Text(playItem.combinedTitle)
-                .scaledToFit()
-            Spacer()
-            Text(playItem.duration ?? "")
-                .font(.body.monospacedDigit())
+        ZStack {
+            RoundedRectangle(cornerRadius: 4)
+                .fill(selected ? Color.primary.opacity(0.2) : Color.black.opacity(0.001))
+                .cornerRadius(5)
+            HStack {
+                Image(systemName: "play.fill")
+                    .foregroundColor(playing ? .secondary : .clear)
+                Text(playItem.indexString ?? "")
+                    .font(.body.monospacedDigit())
+                    .frame(width: 30)
+                Text(playItem.combinedTitle)
+                    .scaledToFit()
+                Spacer()
+                Text(playItem.duration ?? "")
+                    .font(.body.monospacedDigit())
+            }
+            .frame(height: 20)
+            .padding(.leading, 10)
+            .padding(.trailing, 30)
+        }
+        .onTapGesture(count: 2) {
+            print("awd")
+            model.playingItem = playItem.id
+        }
+        .onTapGesture(count: 1) {
+            model.selectedItem = playItem.id
         }
     }
 }
@@ -129,10 +154,17 @@ struct PlaylistView: View {
         }
     }
 
-    var tracks: [Track]
+    let listId: UUID?
+    var tracks: [Track]?
+    var items: [PlayItem] {
+        if let listId = listId {
+            return model.musicLibrary.getPlaylist(id: listId).items
+        } else {
+            return tracks!.map { PlayItem(track: $0, album: model.musicLibrary.getAlbum(for: $0)) }
+        }
+    }
     var sections: [SectionItem] {
         var sections = [SectionItem]()
-        let items = tracks.map { PlayItem(track: $0, album: model.musicLibrary.getAlbum(for: $0)) }
         for item in items {
             if sections.last?.album.id == item.album.id {
                 sections[sections.count - 1].items.append(item)
@@ -145,6 +177,12 @@ struct PlaylistView: View {
 
     init(tracks: [Track]) {
         self.tracks = tracks
+        self.listId = nil
+    }
+
+    init(_ listId: UUID) {
+        self.tracks = nil
+        self.listId = listId
     }
 
     var body: some View {

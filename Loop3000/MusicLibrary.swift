@@ -152,7 +152,7 @@ class Track: Identifiable, Codable {
     }
 }
 
-fileprivate extension Array where Element: Identifiable {
+extension Array where Element: Identifiable {
     func getElementById(id: Element.ID) -> Element? {
         self.first {
             $0.id == id
@@ -545,6 +545,17 @@ class MusicLibrary: Codable {
                 return $0.source.absoluteString < $1.source.absoluteString
             }
             return $0.start.value < $1.start.value
+        }
+    }
+
+    func sorted(albums: [Album]) -> [Album] {
+        albums.sorted { (albumL, albumR) in
+            let albumTitleL = albumL.metadata[MetadataCommonKey.title] ?? "zzz"
+            let albumTitleR = albumR.metadata[MetadataCommonKey.title] ?? "zzz"
+            if albumTitleL != albumTitleR {
+                return albumTitleL < albumTitleR
+            }
+            return albumL.id.uuidString < albumR.id.uuidString
         }
     }
 }

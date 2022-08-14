@@ -28,7 +28,7 @@ struct DiscoverView: View {
                     Spacer()
                     HStack {
                         Spacer()
-                        ProgressView().scaleEffect(2)
+                        ProgressView()
                         Spacer()
                     }
                     Spacer()

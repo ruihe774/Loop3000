@@ -63,14 +63,14 @@ struct Loop3000App: App {
                     model.musicLibrary.performConsolidate()
                 }
                 Divider()
-                Button("Import Library") {
+                Button("Import Library Index") {
                     model.libraryCommands.importLibrary = true
                 }
                 .fileImporter(isPresented: $model.libraryCommands.importLibrary, allowedContentTypes: [.json]) { result in
                     guard let url = try? result.get() else { return }
                     model.musicLibrary.performInputLibrary(from: url)
                 }
-                Button("Export Library") {
+                Button("Export Library Index") {
                     model.libraryCommands.exportLibary = true
                 }
             }
