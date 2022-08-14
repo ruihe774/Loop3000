@@ -22,7 +22,7 @@ fileprivate actor MusicLibraryActor {
         musicLibrary.consolidate()
     }
 
-    func importLibrary(from data: Data) throws {
+    func importLibrary(from data: Data) throws -> (importedAlbums: [Album], importedTracks: [Track]) {
         try musicLibrary.importLibrary(from: data)
     }
 
@@ -58,8 +58,8 @@ class ObservableMusicLibrary: ObservableObject {
     @Published private(set) var requesting: [URL] = []
     @Published private(set) var thrownError: Error?
     @Published private(set) var returnedErrors: [Error] = []
-    @Published private(set) var importedAlbums: [Album]?
-    @Published private(set) var importedTracks: [Track]?
+    @Published private(set) var importedAlbums: [Album] = []
+    @Published private(set) var importedTracks: [Track] = []
 
     @Published private var tasks = Set<UUID>()
 
@@ -157,12 +157,16 @@ class ObservableMusicLibrary: ObservableObject {
     }
 
     func clearResult() {
-        importedAlbums = nil
-        importedTracks = nil
+        importedAlbums = []
+        importedTracks = []
     }
 
     func getTracks(for album: Album) -> [Track] {
         backstore.getTracks(for: album)
+    }
+
+    func getAlbum(for track: Track) -> Album {
+        backstore.getAlbum(for: track)
     }
 
     func performConsolidate() {
@@ -175,7 +179,7 @@ class ObservableMusicLibrary: ObservableObject {
     func performInputLibrary(from url: URL) {
         perform {
             let data = try await URLSession.shared.data(from: url).0
-            try await self.shelf.importLibrary(from: data)
+            self.discovered.send(try await self.shelf.importLibrary(from: data))
             return []
         }
     }
@@ -186,6 +190,10 @@ class ObservableMusicLibrary: ObservableObject {
 
     var canGrabTypes: [UTType] {
         self.backstore.canGrabTypes
+    }
+
+    func sorted(tracks: [Track]) -> [Track] {
+        self.backstore.sorted(tracks: tracks)
     }
 }
 
@@ -206,7 +214,6 @@ struct AlertModel {
 
 enum ShowView {
     case Discover
-    case DiscoverFinish
     case Stub
 }
 
@@ -216,8 +223,19 @@ enum SidebarList {
 }
 
 struct SidebarModel {
-    var currentList = SidebarList.Playlists
+    var currentList = SidebarList.Albums
     var selected: UUID?
+}
+
+extension Publisher {
+    func withPrevious() -> some Publisher<(previous: Output?, current: Output), Failure> {
+        scan(Optional<(Output?, Output)>.none) { ($0?.1, $1) }
+            .compactMap { $0 }
+    }
+
+    func withPrevious(_ initialPreviousValue: Output) -> some Publisher<(previous: Output, current: Output), Failure> {
+        scan((initialPreviousValue, initialPreviousValue)) { ($0.1, $1) }
+    }
 }
 
 class ViewModel: ObservableObject {
@@ -226,6 +244,7 @@ class ViewModel: ObservableObject {
     @Published var alertModel = AlertModel()
 
     @Published var currentView = ShowView.Stub
+    @Published var previousView: ShowView?
 
     @Published var sidebarModel = SidebarModel()
 
@@ -238,16 +257,13 @@ class ViewModel: ObservableObject {
             .sink { [unowned self] _ in self.objectWillChange.send() }
         )
 
-        Publishers.CombineLatest3(musicLibrary.$processing, musicLibrary.$importedAlbums, musicLibrary.$importedTracks)
-            .map { (processing, importedAlbums, importedTracks) in
-                if processing {
-                    return .Discover
-                }
-                if importedAlbums != nil && importedTracks != nil {
-                    return .DiscoverFinish
-                }
-                return .Stub
-            }
+        $currentView
+            .withPrevious()
+            .map { $0.0 }
+            .assign(to: &$previousView)
+
+        musicLibrary.$processing
+            .compactMap { $0 ? .Discover : nil }
             .assign(to: &$currentView)
     }
 
@@ -255,5 +271,10 @@ class ViewModel: ObservableObject {
         alertModel.title = title
         alertModel.message = message
         alertModel.isPresented = true
+    }
+
+    func switchToPreviousView() {
+        guard let previousView = previousView else { return }
+        currentView = previousView
     }
 }

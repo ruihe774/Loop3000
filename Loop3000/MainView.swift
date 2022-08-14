@@ -23,8 +23,6 @@ struct MainView: View {
                 switch (model.currentView) {
                 case .Discover:
                     DiscoverView()
-                case .DiscoverFinish:
-                    DiscoverFinishView()
                 case .Stub:
                     Spacer()
                 }

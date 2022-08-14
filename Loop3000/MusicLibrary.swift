@@ -152,63 +152,6 @@ class Track: Identifiable, Codable {
     }
 }
 
-struct PlayItem {
-    let track: Track
-    let album: Album
-
-    private func universalSplit(_ s: String) -> [String] {
-        s
-            .split { ",;，；、\r\n".contains($0) }
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-    }
-
-    var title: String {
-        track.metadata[MetadataCommonKey.title] ?? track.source.lastPathComponent
-    }
-
-    var artists: [String] {
-        universalSplit(
-            track.metadata[MetadataCommonKey.artist] ??
-            album.metadata[MetadataCommonKey.artist] ??
-            ""
-        )
-    }
-
-    var trackNumber: Int? {
-        if let numberString = track.metadata[MetadataCommonKey.trackNumber] {
-            return Int(numberString)
-        } else {
-            return nil
-        }
-    }
-
-    var discNumber: Int? {
-        if let numberString = track.metadata[MetadataCommonKey.discNumber] {
-            return Int(numberString)
-        } else {
-            return nil
-        }
-    }
-
-    var albumTitle: String? {
-        album.metadata[MetadataCommonKey.title]
-    }
-
-    var albumArtists: [String] {
-        universalSplit(
-            album.metadata[MetadataCommonKey.artist] ??
-            ""
-        )
-    }
-
-    init(track: Track, album: Album) {
-        assert(track.albumId == album.id)
-        self.track = track
-        self.album = album
-    }
-}
-
 fileprivate extension Array where Element: Identifiable {
     func getElementById(id: Element.ID) -> Element? {
         self.first {
@@ -546,20 +489,63 @@ class MusicLibrary: Codable {
         tracks.filter { $0.albumId == album.id }
     }
 
-    func importLibrary(from data: Data) throws {
+    func getAlbum(for track: Track) -> Album {
+        albums.first { $0.id == track.albumId }!
+    }
+
+    func importLibrary(from data: Data) throws -> (importedAlbums: [Album], importedTracks: [Track]) {
         let json = JSONDecoder()
         let importedLibrary = try json.decode(Self.self, from: data)
+        var r = (importedAlbums: [Album](), importedTracks: [Track]())
         for album in importedLibrary.albums {
             if !albums.contains(where: { album.id == $0.id }) {
                 albums.append(album)
+                r.importedAlbums.append(album)
             }
         }
         for track in importedLibrary.tracks {
             if !tracks.contains(where: { track.id == $0.id }) {
                 tracks.append(track)
+                r.importedTracks.append(track)
             }
         }
         consolidate()
+        r.importedAlbums.removeAll { imported in !albums.contains { imported.id == $0.id } }
+        r.importedTracks.removeAll { imported in !tracks.contains { imported.id == $0.id } }
+        return r
+    }
+
+    func sorted(tracks: [Track]) -> [Track] {
+        return tracks.sorted {
+            if $0.albumId != $1.albumId {
+                let albumL = self.getAlbum(for: $0)
+                let albumR = self.getAlbum(for: $1)
+                let albumTitleL = albumL.metadata[MetadataCommonKey.title] ?? "zzz"
+                let albumTitleR = albumR.metadata[MetadataCommonKey.title] ?? "zzz"
+                if albumTitleL != albumTitleR {
+                    return albumTitleL < albumTitleR
+                }
+                return $0.albumId.uuidString < $1.albumId.uuidString
+            }
+            let discNumberL = $0.metadata[MetadataCommonKey.discNumber].flatMap { Int($0) }
+            let discNumberR = $1.metadata[MetadataCommonKey.discNumber].flatMap { Int($0) }
+            if discNumberL != discNumberR {
+                if discNumberL == nil { return false }
+                if discNumberR == nil { return true }
+                return discNumberL! < discNumberR!
+            }
+            let trackNumberL = $0.metadata[MetadataCommonKey.trackNumber].flatMap { Int($0) }
+            let trackNumberR = $1.metadata[MetadataCommonKey.trackNumber].flatMap { Int($0) }
+            if trackNumberL != trackNumberR {
+                if trackNumberL == nil { return false }
+                if trackNumberR == nil { return true }
+                return trackNumberL! < trackNumberR!
+            }
+            if $0.source.absoluteString != $1.source.absoluteString {
+                return $0.source.absoluteString < $1.source.absoluteString
+            }
+            return $0.start.value < $1.start.value
+        }
     }
 }
 
