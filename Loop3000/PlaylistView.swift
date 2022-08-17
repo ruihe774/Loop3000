@@ -93,6 +93,7 @@ struct PlayItem: Identifiable {
 
 struct PlayItemView: View {
     @EnvironmentObject var model: ViewModel
+    @State var lastTap = DispatchTime.init(uptimeNanoseconds: 0)
 
     var playItem: PlayItem
 
@@ -100,8 +101,8 @@ struct PlayItemView: View {
         model.selectedItem == playItem.id
     }
 
-    var playing: Bool {
-        model.playingItem == playItem.id
+    var currentPlaying: Bool {
+        model.playing && model.playingItem == playItem.id
     }
 
     init(_ playItem: PlayItem) {
@@ -111,11 +112,11 @@ struct PlayItemView: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 4)
-                .fill(selected ? Color.primary.opacity(0.1) : Color.black.opacity(0.001))
+                .fill(selected ? Color(nsColor: .quaternaryLabelColor) : Color.black.opacity(0.001))
                 .cornerRadius(5)
             HStack {
                 Image(systemName: "play.fill")
-                    .foregroundColor(playing ? .secondary : .clear)
+                    .foregroundColor(currentPlaying ? .secondary : .clear)
                 Text(playItem.indexString ?? "")
                     .font(.body.monospacedDigit())
                     .frame(width: 30)
@@ -129,12 +130,15 @@ struct PlayItemView: View {
             .padding(.leading, 10)
             .padding(.trailing, 30)
         }
-        .onTapGesture(count: 2) {
-            print("awd")
-            model.playingItem = playItem.id
-        }
-        .onTapGesture(count: 1) {
-            model.selectedItem = playItem.id
+        .onTapGesture {
+            let now = DispatchTime.now()
+            if now.uptimeNanoseconds - lastTap.uptimeNanoseconds < 300000000 {
+                model.playingItem = playItem.id
+                model.playing = true
+            } else {
+                model.selectedItem = playItem.id
+            }
+            lastTap = now
         }
     }
 }
@@ -158,7 +162,7 @@ struct PlaylistView: View {
     var tracks: [Track]?
     var items: [PlayItem] {
         if let listId = listId {
-            return model.musicLibrary.getPlaylist(id: listId).items
+            return model.musicLibrary.getPlaylist(id: listId)!.items
         } else {
             return tracks!.map { PlayItem(track: $0, album: model.musicLibrary.getAlbum(for: $0)) }
         }

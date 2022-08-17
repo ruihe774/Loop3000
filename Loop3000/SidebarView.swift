@@ -24,18 +24,19 @@ struct Sidebar: View {
     var body: some View {
         VStack {
             TextField(text: $filterString) {}
+                .padding(.leading, 23.5)
                 .overlay {
                     HStack {
-                        filterString.isEmpty ? Image(systemName: "magnifyingglass") : nil
+                        Image(systemName: "magnifyingglass")
                         filterString.isEmpty ? Text("Search") : nil
                         Spacer()
                     }
                     .foregroundColor(.secondary)
                 }
+                .padding([.leading, .trailing], 10)
                 .frame(height: 30)
                 .textFieldStyle(.plain)
-                .padding([.leading, .trailing], 10)
-                .background(RoundedRectangle(cornerRadius: 8).fill(.primary.opacity(0.1)))
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color(nsColor: .quaternaryLabelColor).opacity(0.5)))
                 .padding(.bottom, 10)
             HStack(spacing: 15) {
                 Button {
@@ -74,7 +75,7 @@ struct Sidebar: View {
                         }
                         .buttonStyle(.borderless)
                         .padding(8)
-                        .background(selected ? Color.primary.opacity(0.2) : .clear)
+                        .background(selected ? Color(nsColor: .quaternaryLabelColor) : .clear)
                         .cornerRadius(8)
                     }
                 }
