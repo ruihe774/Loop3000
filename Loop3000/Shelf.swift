@@ -434,10 +434,14 @@ func mergeShelf(_ a: Shelf, _ b: Shelf) -> Shelf {
                 "TRACKTOTAL":
                 ()
             default:
-                if let value = commonMetadata(tracks, for: key), album.metadata[key] == nil {
-                    album.metadata[key] = value
-                    for track in tracks {
-                        track.metadata[key] = nil
+                if let value = commonMetadata(tracks, for: key) {
+                    if album.metadata[key] == nil {
+                        album.metadata[key] = value
+                    }
+                    if album.metadata[key] == value {
+                        for track in tracks {
+                            track.metadata[key] = nil
+                        }
                     }
                 }
             }

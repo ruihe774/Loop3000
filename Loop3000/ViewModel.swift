@@ -196,7 +196,6 @@ class MusicLibrary: ObservableObject {
         if let data = try? readData(from: shelfURL) {
             let decoder = PropertyListDecoder()
             shelf = try! decoder.decode(Shelf.self, from: data)
-            print(shelf)
         }
         let syncQueue = DispatchQueue(label: "MusicLibrary.sync")
         ac.append($shelf
