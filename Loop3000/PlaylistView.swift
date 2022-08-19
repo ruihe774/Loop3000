@@ -1,9 +1,11 @@
 import SwiftUI
 
-struct PlayItem: Identifiable {
+fileprivate struct PlaylistViewItem: Unicorn {
     let id = UUID()
     let track: Track
     let album: Album
+    let playlistItem: PlaylistItem?
+    let playlist: Playlist?
 
     private func universalSplit(_ s: String) -> [String] {
         s
@@ -25,19 +27,11 @@ struct PlayItem: Identifiable {
     }
 
     var trackNumber: Int? {
-        if let numberString = track.metadata[MetadataCommonKey.trackNumber] {
-            return Int(numberString)
-        } else {
-            return nil
-        }
+        track.metadata[MetadataCommonKey.trackNumber].flatMap { Int($0) }
     }
 
     var discNumber: Int? {
-        if let numberString = track.metadata[MetadataCommonKey.discNumber] {
-            return Int(numberString)
-        } else {
-            return nil
-        }
+        track.metadata[MetadataCommonKey.discNumber].flatMap { Int($0) }
     }
 
     var indexString: String? {
@@ -83,47 +77,42 @@ struct PlayItem: Identifiable {
         let s = Timestamp(value: track.end.value - track.start.value).description
         return String(s[..<s.index(s.startIndex, offsetBy: 5)])
     }
-
-    init(track: Track, album: Album) {
-        assert(track.albumId == album.id)
-        self.track = track
-        self.album = album
-    }
 }
 
-struct PlayItemView: View {
-    @EnvironmentObject var model: ViewModel
-    @State var lastTap = DispatchTime.init(uptimeNanoseconds: 0)
+fileprivate struct PlaylistItemView: View {
+    @EnvironmentObject private var model: ViewModel
 
-    var playItem: PlayItem
+    @State private var lastTap = DispatchTime.init(uptimeNanoseconds: 0)
 
-    var selected: Bool {
-        model.selectedItem == playItem.id
+    private var viewItem: PlaylistViewItem
+
+    private var selected: Bool {
+        viewItem.playlistItem != nil && model.selectedItem == viewItem.playlistItem
     }
 
-    var currentPlaying: Bool {
-        model.playing && model.playingItem == playItem.id
+    private var currentPlaying: Bool {
+        viewItem.playlistItem != nil && model.playing && model.playingItem == viewItem.playlistItem
     }
 
-    init(_ playItem: PlayItem) {
-        self.playItem = playItem
+    init(_ viewItem: PlaylistViewItem) {
+        self.viewItem = viewItem
     }
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 4)
+            RoundedRectangle(cornerRadius: 5)
                 .fill(selected ? Color(nsColor: .quaternaryLabelColor) : Color.black.opacity(0.001))
-                .cornerRadius(5)
             HStack {
-                Image(systemName: "play.fill")
+                Label("Playing", systemImage: "play.fill")
                     .foregroundColor(currentPlaying ? .secondary : .clear)
-                Text(playItem.indexString ?? "")
+                    .labelStyle(.iconOnly)
+                Text(viewItem.indexString ?? "")
                     .font(.body.monospacedDigit())
                     .frame(width: 30)
-                Text(playItem.combinedTitle)
+                Text(viewItem.combinedTitle)
                     .scaledToFit()
                 Spacer()
-                Text(playItem.duration ?? "")
+                Text(viewItem.duration ?? "")
                     .font(.body.monospacedDigit())
             }
             .frame(height: 20)
@@ -131,12 +120,12 @@ struct PlayItemView: View {
             .padding(.trailing, 30)
         }
         .onTapGesture {
+            guard let playlistItem = viewItem.playlistItem else { return }
             let now = DispatchTime.now()
             if now.uptimeNanoseconds - lastTap.uptimeNanoseconds < 300000000 {
-                model.playingItem = playItem.id
-                model.playing = true
+                model.play(playlistItem)
             } else {
-                model.selectedItem = playItem.id
+                model.selectedItem = playlistItem
             }
             lastTap = now
         }
@@ -144,32 +133,42 @@ struct PlayItemView: View {
 }
 
 struct PlaylistView: View {
-    @EnvironmentObject var model: ViewModel
+    @EnvironmentObject private var model: ViewModel
 
-    struct SectionItem: Identifiable {
-        let id: UUID
+    private struct SectionItem: Identifiable {
+        let id = UUID()
         let album: Album
-        var items: [PlayItem]
+        var items: [PlaylistViewItem]
 
-        init(album: Album, items: [PlayItem]) {
+        init(album: Album, items: [PlaylistViewItem]) {
             self.album = album
             self.items = items
-            self.id = album.id
         }
     }
 
-    let listId: UUID?
-    var tracks: [Track]?
-    var items: [PlayItem] {
-        if let listId = listId {
-            return model.musicLibrary.getPlaylist(id: listId)!.items
+    private let playlist: Playlist?
+    private var tracks: [Track]?
+    private var viewItems: [PlaylistViewItem] {
+        if let playlist {
+            return playlist.items.map {
+                let track = model.musicLibrary.getTrack(by: $0.trackId)
+                let album = model.musicLibrary.getAlbum(for: track)
+                return PlaylistViewItem(track: track, album: album, playlistItem: $0, playlist: playlist)
+            }
         } else {
-            return tracks!.map { PlayItem(track: $0, album: model.musicLibrary.getAlbum(for: $0)) }
+            return tracks!.map {
+                return PlaylistViewItem(
+                    track: $0,
+                    album: model.musicLibrary.getAlbum(for: $0),
+                    playlistItem: nil,
+                    playlist: nil
+                )
+            }
         }
     }
-    var sections: [SectionItem] {
+    private var sections: [SectionItem] {
         var sections = [SectionItem]()
-        for item in items {
+        for item in viewItems {
             if sections.last?.album.id == item.album.id {
                 sections[sections.count - 1].items.append(item)
             } else {
@@ -181,12 +180,12 @@ struct PlaylistView: View {
 
     init(tracks: [Track]) {
         self.tracks = tracks
-        self.listId = nil
+        self.playlist = nil
     }
 
-    init(_ listId: UUID) {
+    init(_ playlist: Playlist) {
         self.tracks = nil
-        self.listId = listId
+        self.playlist = playlist
     }
 
     var body: some View {
@@ -194,7 +193,7 @@ struct PlaylistView: View {
             let items = section.items
             Section(items.first!.combinedAlbumTitle ?? "<No Title>") {
                 ForEach(items) { item in
-                    PlayItemView(item)
+                    PlaylistItemView(item)
                 }
             }
         }

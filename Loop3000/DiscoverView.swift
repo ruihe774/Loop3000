@@ -8,13 +8,21 @@ extension URL: Identifiable {
 }
 
 struct DiscoverView: View {
-    @EnvironmentObject var model: ViewModel
+    @EnvironmentObject private var model: ViewModel
 
     @State private var dotCount = 0
     private var dotTimer = Timer.publish(every: 0.5, on: .main, in: .default)
 
-    var sortedImportedTracks: [Track] {
+    private var sortedImportedTracks: [Track] {
         model.musicLibrary.sorted(tracks: model.musicLibrary.importedTracks)
+    }
+
+    private var errors: [Error] {
+        if let thrownError = model.musicLibrary.thrownError {
+            return [thrownError] + model.musicLibrary.returnedError
+        } else {
+            return model.musicLibrary.returnedError
+        }
     }
 
     var body: some View {
@@ -51,21 +59,35 @@ struct DiscoverView: View {
             })
         } else {
             VStack(alignment: .leading, spacing: 0) {
-                if !model.musicLibrary.importedTracks.isEmpty {
-                    Text("Imported music")
-                        .font(.headline)
-                        .padding()
-                    Divider()
-                    PlaylistView(tracks: sortedImportedTracks)
-                    Divider()
-                } else {
-                    Spacer()
-                    HStack {
+                if model.musicLibrary.thrownError == nil {
+                    if !model.musicLibrary.importedTracks.isEmpty {
+                        Label("Imported music", systemImage: "square.and.arrow.down.on.square")
+                            .font(.headline)
+                            .padding()
+                        Divider()
+                        PlaylistView(tracks: sortedImportedTracks)
+                    } else {
                         Spacer()
-                        Text("Your music library is up to date.")
+                        HStack {
+                            Spacer()
+                            Text("Your music library is up to date.")
+                            Spacer()
+                        }
                         Spacer()
                     }
-                    Spacer()
+                }
+                Divider()
+                if !errors.isEmpty {
+                    Label("Encountered errors", systemImage: "exclamationmark.triangle")
+                        .font(.headline)
+                        .foregroundColor(model.musicLibrary.thrownError == nil ? .yellow : .red)
+                        .padding()
+                    Divider()
+                    List(errors.map { (id: UUID(), error: $0) }, id: \.id) { (_, error) in
+                        let description = (error as CustomStringConvertible).description
+                        Text(description)
+                    }
+                    .frame(height: 100)
                 }
                 HStack {
                     Spacer()

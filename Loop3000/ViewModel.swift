@@ -2,241 +2,221 @@ import Foundation
 import Combine
 import UniformTypeIdentifiers
 
-class Playlist: Identifiable {
-    let id: UUID
-    var title: String
-    var items: [PlayItem]
-
-    init(id: UUID = UUID(), title: String, items: [PlayItem]) {
-        self.id = id
-        self.title = title
-        self.items = items
+extension Album {
+    var uiTitle: String {
+        metadata[MetadataCommonKey.title] ?? "<No Title>"
     }
 }
 
-fileprivate actor MusicLibraryActor {
-    private let musicLibrary: MusicLibrary
-
-    init(musicLibrary: MusicLibrary) {
-        self.musicLibrary = musicLibrary
+fileprivate struct ObservableRequestTracer: RequestTracer {
+    func add(_ url: URL) {
+        adding.send(url)
     }
 
-    func importMedia(from url: URL) async throws -> (importedAlbums: [Album], importedTracks: [Track]) {
-        try await musicLibrary.importMedia(from: url)
+    func remove(_ url: URL) {
+        removing.send(url)
     }
 
-    func discover(at url: URL, recursive: Bool = false, consolidate: Bool = true)
-    async throws -> (importedAlbums: [Album], importedTracks: [Track], errors: [Error]) {
-        try await musicLibrary.discover(at: url, recursive: recursive, consolidate: consolidate)
-    }
-
-    func consolidate() {
-        musicLibrary.consolidate()
-    }
-
-    func importLibrary(from data: Data) throws -> (importedAlbums: [Album], importedTracks: [Track]) {
-        try musicLibrary.importLibrary(from: data)
-    }
-
-    var albums: [Album] {
-        musicLibrary.albums
-    }
-
-    var tracks: [Track] {
-        musicLibrary.tracks
-    }
+    var adding: PassthroughSubject<URL, Never>
+    var removing: PassthroughSubject<URL, Never>
 }
 
-extension Publisher {
-    func `await`<T>(_ f: @escaping (Output) async -> T) -> some Publisher<T, Failure> {
-        flatMap { value -> Future<T, Failure> in
-            Future { promise in
-                Task {
-                    let result = await f(value)
-                    promise(.success(result))
-                }
-            }
-        }
-    }
-}
-
-class ObservableMusicLibrary: ObservableObject {
-    private let backstore = MusicLibrary()
-    private let shelf: MusicLibraryActor
-
+class MusicLibrary: ObservableObject {
+    @Published private var shelf = Shelf()
     @Published private(set) var albums: [Album] = []
     @Published private(set) var tracks: [Track] = []
-    @Published private(set) var albumPlaylists: [Playlist] = []
     @Published private(set) var manualPlaylists: [Playlist] = []
-    @Published private(set) var processing = false
-    @Published private(set) var requesting: [URL] = []
-    @Published private(set) var thrownError: Error?
-    @Published private(set) var returnedErrors: [Error] = []
+    @Published private(set) var albumPlaylists: [Playlist] = []
+    @Published private(set) var playlists: [Playlist] = []
+
     @Published private(set) var importedAlbums: [Album] = []
     @Published private(set) var importedTracks: [Track] = []
-
-    @Published private var tasks = Set<UUID>()
-
-    private let taskStarted = PassthroughSubject<UUID, Never>()
-    private let taskFinished = PassthroughSubject<(taskId: UUID, thrownError: Error?, returnedErrors: [Error]), Never>()
-    private let discovered = PassthroughSubject<(importedAlbums: [Album], importedTracks: [Track]), Never>()
+    @Published private(set) var thrownError: Error?
+    @Published private(set) var returnedError: [Error] = []
+    @Published private(set) var requesting: [URL] = []
+    @Published private(set) var processing = false
+    @Published private var importedAlbumsOO: [Album] = []
+    @Published private var importedTracksOO: [Track] = []
+    @Published private var thrownErrorOO: Error?
+    @Published private var returnedErrorOO: [Error] = []
+    @Published private var processingOO = false
+    @Published private var shelfOO = Shelf()
+    private let asyncQueue = AsyncQueue()
+    private let tracer = ObservableRequestTracer(adding: PassthroughSubject(), removing: PassthroughSubject())
 
     private var ac: [any Cancellable] = []
 
     init() {
-        shelf = MusicLibraryActor(musicLibrary: backstore)
-        backstore.requestTracer = RequestTracer()
-        
-        ac.append(taskStarted
-            .receive(on: DispatchQueue.main)
-            .sink { [unowned self] taskId in
-                self.tasks.insert(taskId)
-            })
-
-        ac.append(taskFinished
-            .receive(on: DispatchQueue.main)
-            .sink { [unowned self] (taskId, thrownError, returnedErrors) in
-                self.tasks.remove(taskId)
-                self.thrownError = thrownError
-                self.returnedErrors = returnedErrors
-            })
-
-        let reassign = taskFinished
-            .await { [unowned self] _ in
-                async let albums = self.shelf.albums
-                async let tracks = self.shelf.tracks
-                return await (albums: albums, tracks: tracks)
-            }
-            .receive(on: DispatchQueue.main)
-            .share()
-        reassign
+        $shelf
             .map { $0.albums }
             .assign(to: &$albums)
-        reassign
+
+        $shelf
             .map { $0.tracks }
             .assign(to: &$tracks)
 
-        $tasks
-            .map { !$0.isEmpty }
-            .assign(to: &$processing)
+        $shelf
+            .map { $0.manualPlaylists }
+            .assign(to: &$manualPlaylists)
 
-        discovered
-            .receive(on: DispatchQueue.main)
-            .map { ( importedAlbums, _) in importedAlbums }
-            .assign(to: &$importedAlbums)
-
-        discovered
-            .receive(on: DispatchQueue.main)
-            .map { (_, importedTracks) in importedTracks }
-            .assign(to: &$importedTracks)
-
-        ac.append(Timer.publish(every: 2, on: .main, in: .default)
-            .autoconnect()
-            .compactMap { [unowned self] date in self.processing ? date : nil }
-            .sink { [unowned self] _ in
-                self.requesting = self.backstore.requestTracer!.urls
-            }
-        )
-
-        $albums
-            .map { [unowned self] albums in
-                self.sorted(albums: albums).map { album in
-                    let tracks = self.getTracks(for: album)
-                    let items = self.sorted(tracks: tracks).map { track in PlayItem(track: track, album: album) }
-                    return Playlist(id: album.id, title: album.title ?? "<No Title>", items: items)
+        $shelf
+            .map { shelf in
+                shelf.albums.map { album in
+                    Playlist(title: album.uiTitle, items: shelf.getTracks(for: album).map { PlaylistItem(trackId: $0.id) })
                 }
             }
             .assign(to: &$albumPlaylists)
-    }
 
-    private func perform(operation: @escaping () async throws -> [Error]) {
-        clearResult()
-        let taskId = UUID()
-        taskStarted.send(taskId)
-        Task {
-            var thrownError: Error?
-            var returnedErrors: [Error] = []
-            do {
-                returnedErrors = try await operation()
-            } catch let error {
-                thrownError = error
+        Publishers.CombineLatest($albumPlaylists, $manualPlaylists)
+            .map { (albumPlaylists, manualPlaylists) in
+                albumPlaylists + manualPlaylists
             }
-            taskFinished.send((taskId: taskId, thrownError: thrownError, returnedErrors: returnedErrors))
-        }
+            .assign(to: &$playlists)
+
+        ac.append(tracer.adding
+            .receive(on: RunLoop.main)
+            .sink { [unowned self] url in
+                self.requesting.append(url)
+            }
+        )
+
+        ac.append(tracer.removing
+            .receive(on: RunLoop.main)
+            .sink { [unowned self] url in
+                if let index = self.requesting.lastIndex(of: url) {
+                    self.requesting.remove(at: index)
+                }
+            }
+        )
+
+        $importedAlbumsOO.receive(on: RunLoop.main).assign(to: &$importedAlbums)
+        $importedTracksOO.receive(on: RunLoop.main).assign(to: &$importedTracks)
+        $thrownErrorOO.receive(on: RunLoop.main).assign(to: &$thrownError)
+        $returnedErrorOO.receive(on: RunLoop.main).assign(to: &$returnedError)
+        $processingOO.receive(on: RunLoop.main).assign(to: &$processing)
+        $shelfOO.receive(on: RunLoop.main).assign(to: &$shelf)
     }
 
-    func performImportMedia(from url: URL) {
-        perform {
-            let r = try await self.shelf.importMedia(from: url)
-            self.discovered.send(r)
-            return []
-        }
-    }
-
-    func performDiscover(at url: URL, recursive: Bool = false, consolidate: Bool = true) {
-        perform {
-            let r = try await self.shelf.discover(at: url, recursive: recursive, consolidate: consolidate)
-            self.discovered.send((importedAlbums: r.importedAlbums, importedTracks: r.importedTracks))
-            return r.errors
+    private func perform(_ operation: @escaping () async throws -> [Error]) {
+        Task {
+            await asyncQueue.perform({
+                self.processingOO = true
+                self.returnedErrorOO = []
+                self.thrownErrorOO = nil
+                do {
+                    self.returnedErrorOO = try await operation()
+                } catch let error {
+                    self.thrownErrorOO = error
+                }
+                self.processingOO = false
+            })
         }
     }
 
     func clearResult() {
-        importedAlbums = []
-        importedTracks = []
+        importedAlbumsOO = []
+        importedTracksOO = []
     }
 
-    func getTracks(for album: Album) -> [Track] {
-        backstore.getTracks(for: album)
-    }
-
-    func getAlbum(for track: Track) -> Album {
-        backstore.getAlbum(for: track)
-    }
-
-    func performConsolidate() {
+    func performScanMedia(at url: URL) {
         perform {
-            await self.shelf.consolidate()
+            self.clearResult()
+            let (albums, tracks) = try await scanMedia(at: url, tracer: self.tracer)
+            let newShelf = Shelf(albums: albums, tracks: tracks)
+            self.shelfOO = sortedShelf(mergeShelf(self.shelf, newShelf))
+            self.importedAlbumsOO = albums.filter { self.shelfOO.albums.contains($0) }
+            self.importedTracksOO = tracks.filter { self.shelfOO.tracks.contains($0) }
             return []
         }
     }
 
-    func performInputLibrary(from url: URL) {
+    func performDiscoverMedia(at url: URL, recursive: Bool = false) {
         perform {
-            let data = try await URLSession.shared.data(from: url).0
-            self.discovered.send(try await self.shelf.importLibrary(from: data))
-            return []
+            self.clearResult()
+            let (albums, tracks, errors) = try await discoverMedia(at: url, recursive: recursive, tracer: self.tracer)
+            let newShelf = Shelf(albums: albums, tracks: tracks)
+            self.shelfOO = sortedShelf(mergeShelf(self.shelf, newShelf))
+            self.importedAlbumsOO = albums.filter { self.shelfOO.albums.contains($0) }
+            self.importedTracksOO = tracks.filter { self.shelfOO.tracks.contains($0) }
+            return errors
         }
     }
 
     var canImportTypes: [UTType] {
-        self.backstore.canImportTypes
+        mediaImporters.flatMap { $0.supportedTypes }
     }
 
     var canGrabTypes: [UTType] {
-        self.backstore.canGrabTypes
+        metadataGrabbers.flatMap { $0.supportedTypes }
     }
 
-    func sorted(tracks: [Track]) -> [Track] {
-        self.backstore.sorted(tracks: tracks)
+    func getTracks(for album: Album) -> [Track] {
+        shelf.getTracks(for: album)
+    }
+
+    func getTracks(for playlist: Playlist) -> [Track] {
+        shelf.getTracks(for: playlist)
+    }
+
+    func getAlbum(for track: Track) -> Album {
+        shelf.getAlbum(for: track)
+    }
+
+    func getAlbum(by id: UUID) -> Album {
+        albums.get(by: id)!
+    }
+
+    func getTrack(by id: UUID) -> Track {
+        tracks.get(by: id)!
+    }
+
+    func getPlaylist(by id: UUID) -> Playlist {
+        playlists.get(by: id)!
+    }
+
+    func getPlaylist(for item: PlaylistItem) -> Playlist {
+        playlists.first { $0.items.contains(item) }!
     }
 
     func sorted(albums: [Album]) -> [Album] {
-        self.backstore.sorted(albums: albums)
+        shelf.sorted(albums: albums)
     }
 
-    func getPlaylist(id: UUID) -> Playlist {
-        return (albumPlaylists.first { $0.id == id } ?? manualPlaylists.first { $0.id == id })!
+    func sorted(tracks: [Track]) -> [Track] {
+        shelf.sorted(tracks: tracks)
+    }
+
+    func syncWithStorage() {
+        let fileManager = FileManager.default
+        let applicationSupport = try! fileManager.url(
+            for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: false
+        ).appending(component: "Loop3000")
+        try! fileManager.createDirectory(at: applicationSupport, withIntermediateDirectories: true)
+        let shelfURL = applicationSupport.appending(component: "shelf.plist")
+        if let data = try? readData(from: shelfURL) {
+            let decoder = PropertyListDecoder()
+            shelf = try! decoder.decode(Shelf.self, from: data)
+            print(shelf)
+        }
+        let syncQueue = DispatchQueue(label: "MusicLibrary.sync")
+        ac.append($shelf
+            .sink { shelf in
+                syncQueue.async {
+                    let encoder = PropertyListEncoder()
+                    encoder.outputFormat = .binary
+                    let encoded = try! encoder.encode(shelf)
+                    try! encoded.write(to: shelfURL)
+                }
+            }
+        )
     }
 }
+
 
 struct LibraryCommands {
     var showFileAdder = false
     var showFolderAdder = false
     var showDiscoverer = false
-    var consolidate = false
-    var importLibrary = false
-    var exportLibary = false
 }
 
 struct AlertModel {
@@ -251,47 +231,26 @@ enum ShowView {
     case Stub
 }
 
-enum SidebarListType {
-    case Albums
-    case Playlists
-}
-
-struct SidebarModel {
-    var selected: UUID?
-}
-
-extension Publisher {
-    func withPrevious() -> some Publisher<(previous: Output?, current: Output), Failure> {
-        scan(Optional<(Output?, Output)>.none) { ($0?.1, $1) }
-            .compactMap { $0 }
-    }
-
-    func withPrevious(_ initialPreviousValue: Output) -> some Publisher<(previous: Output, current: Output), Failure> {
-        scan((initialPreviousValue, initialPreviousValue)) { ($0.1, $1) }
-    }
-}
-
 class ViewModel: ObservableObject {
-    @Published var musicLibrary = ObservableMusicLibrary()
+    @Published private(set) var musicLibrary = MusicLibrary()
     @Published var libraryCommands = LibraryCommands()
     @Published var alertModel = AlertModel()
 
-    @Published var currentView = ShowView.Stub
-    @Published var previousView: ShowView?
+    @Published private(set) var currentView = ShowView.Stub
+    @Published private(set) var previousView: ShowView?
 
-    @Published var sidebarListType = SidebarListType.Albums
-
-    @Published var selectedList: UUID?
-    @Published var playingList: UUID?
-    @Published var selectedItem: UUID?
-    @Published var playingItem: UUID?
+    @Published var selectedList: Playlist?
+    @Published private(set) var playingList: Playlist?
+    @Published var selectedItem: PlaylistItem?
+    @Published private(set) var playingItem: PlaylistItem?
+    @Published private(set) var playing = false
 
     private var ac: [any Cancellable] = []
 
     init() {
         ac.append(musicLibrary
             .objectWillChange
-            .receive(on: DispatchQueue.main)
+            .receive(on: RunLoop.main)
             .sink { [unowned self] _ in self.objectWillChange.send() }
         )
 
@@ -322,4 +281,20 @@ class ViewModel: ObservableObject {
         guard let previousView = previousView else { return }
         currentView = previousView
     }
+
+    func play(_ item: PlaylistItem) {
+
+    }
+
+    func pause() {
+
+    }
+
+    func resume() {
+
+    }
+
+    func playPrevious() {}
+
+    func playNext() {}
 }

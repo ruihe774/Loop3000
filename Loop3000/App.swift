@@ -3,10 +3,7 @@ import UniformTypeIdentifiers
 
 @main
 struct Loop3000App: App {
-    @StateObject var model = ViewModel()
-    var musicLibrary: ObservableMusicLibrary {
-        model.musicLibrary
-    }
+    @StateObject private var model = ViewModel()
 
     var body: some Scene {
         Window("Loop 3000", id: "main") {
@@ -19,22 +16,25 @@ struct Loop3000App: App {
                 Text(model.alertModel.message)
             }
             .edgesIgnoringSafeArea(.all)
+            .onAppear {
+                model.musicLibrary.syncWithStorage()
+            }
         }
         .windowStyle(.hiddenTitleBar)
         .commands {
-            CommandMenu("Library") {
+            CommandGroup(after: .newItem) {
                 Button("Add File") {
                     model.libraryCommands.showFileAdder = true
                 }
                 .keyboardShortcut("a", modifiers: [.command, .option])
                 .fileImporter(
                     isPresented: $model.libraryCommands.showFileAdder,
-                    allowedContentTypes: musicLibrary.canImportTypes
+                    allowedContentTypes: model.musicLibrary.canImportTypes
                 ) { result in
                     guard let url = try? result.get() else { return }
                     let type = UTType(filenameExtension: url.pathExtension)!
                     if type.conforms(to: .audio) {
-                        musicLibrary.performImportMedia(from: url)
+                        model.musicLibrary.performScanMedia(at: url)
                     } else {
                         model.alert(title: "Add File", message: "Please use “Add Folder” to add the whole album.")
                     }
@@ -46,9 +46,9 @@ struct Loop3000App: App {
                     isPresented: $model.libraryCommands.showFolderAdder,
                     allowedContentTypes: [.folder]
                 ) { result in
-                    (try? result.get()).map { musicLibrary.performDiscover(at: $0, recursive: false) }
+                    (try? result.get()).map { model.musicLibrary.performDiscoverMedia(at: $0, recursive: false) }
                 }
-                Button("Discover") {
+                Button("Discover Music") {
                     model.libraryCommands.showDiscoverer = true
                 }
                 .keyboardShortcut("d", modifiers: [.command, .option])
@@ -56,22 +56,7 @@ struct Loop3000App: App {
                     isPresented: $model.libraryCommands.showDiscoverer,
                     allowedContentTypes: [.folder]
                 ) { result in
-                    (try? result.get()).map { musicLibrary.performDiscover(at: $0, recursive: true) }
-                }
-                Divider()
-                Button("Consolidate") {
-                    model.musicLibrary.performConsolidate()
-                }
-                Divider()
-                Button("Import Library Index") {
-                    model.libraryCommands.importLibrary = true
-                }
-                .fileImporter(isPresented: $model.libraryCommands.importLibrary, allowedContentTypes: [.json]) { result in
-                    guard let url = try? result.get() else { return }
-                    model.musicLibrary.performInputLibrary(from: url)
-                }
-                Button("Export Library Index") {
-                    model.libraryCommands.exportLibary = true
+                    (try? result.get()).map { model.musicLibrary.performDiscoverMedia(at: $0, recursive: true) }
                 }
             }
         }

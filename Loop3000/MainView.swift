@@ -1,25 +1,14 @@
 import SwiftUI
 
-struct WindowBackgrounMaterial: NSViewRepresentable {
-    func makeNSView(context _: Self.Context) -> NSView {
-        let visualEffect = NSVisualEffectView()
-        visualEffect.material = .windowBackground
-        return visualEffect
-    }
-    func updateNSView(_: NSView, context _: Context) {}
-}
-
 struct MainView: View {
-    @EnvironmentObject var model: ViewModel
+    @EnvironmentObject private var model: ViewModel
 
-    
-    
     var body: some View {
         HStack(spacing: 0) {
             Sidebar()
             ZStack {
                 Rectangle()
-                    .background(WindowBackgrounMaterial())
+                    .background(Color(nsColor: .windowBackgroundColor))
                     .foregroundColor(.clear)
                     .shadow(radius: 1)
                 VStack(spacing: 0) {

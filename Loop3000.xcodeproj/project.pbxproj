@@ -9,20 +9,21 @@
 /* Begin PBXBuildFile section */
 		6604F69F28A90F4400B84549 /* PlaylistView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6604F69E28A90F4400B84549 /* PlaylistView.swift */; };
 		6604F6A128A92BF900B84549 /* PlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6604F6A028A92BF900B84549 /* PlayerView.swift */; };
-		661B751628A47C9900B9C012 /* MusicLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 661B751528A47C9800B9C012 /* MusicLibrary.swift */; };
+		661B751628A47C9900B9C012 /* Shelf.swift in Sources */ = {isa = PBXBuildFile; fileRef = 661B751528A47C9800B9C012 /* Shelf.swift */; };
+		662C8AC028AF8C5C003983FE /* Util.swift in Sources */ = {isa = PBXBuildFile; fileRef = 662C8ABF28AF8C5C003983FE /* Util.swift */; };
 		66684C7628A7C28800C32BC8 /* ViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66684C7528A7C28800C32BC8 /* ViewModel.swift */; };
 		66684C7828A7FC6700C32BC8 /* DiscoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66684C7728A7FC6700C32BC8 /* DiscoverView.swift */; };
 		66684C7C28A823A500C32BC8 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66684C7B28A823A500C32BC8 /* SidebarView.swift */; };
 		669C586128A47B4D0038A986 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 669C586028A47B4D0038A986 /* App.swift */; };
 		669C586328A47B4D0038A986 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 669C586228A47B4D0038A986 /* MainView.swift */; };
 		669C586528A47B4E0038A986 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 669C586428A47B4E0038A986 /* Assets.xcassets */; };
-		66E77E5528A54CA400FE6C1E /* AsyncReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66E77E5428A54CA300FE6C1E /* AsyncReader.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		6604F69E28A90F4400B84549 /* PlaylistView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistView.swift; sourceTree = "<group>"; };
 		6604F6A028A92BF900B84549 /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
-		661B751528A47C9800B9C012 /* MusicLibrary.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MusicLibrary.swift; sourceTree = "<group>"; };
+		661B751528A47C9800B9C012 /* Shelf.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Shelf.swift; sourceTree = "<group>"; };
+		662C8ABF28AF8C5C003983FE /* Util.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Util.swift; sourceTree = "<group>"; };
 		66684C7528A7C28800C32BC8 /* ViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewModel.swift; sourceTree = "<group>"; };
 		66684C7728A7FC6700C32BC8 /* DiscoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverView.swift; sourceTree = "<group>"; };
 		66684C7B28A823A500C32BC8 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
@@ -32,7 +33,6 @@
 		669C586228A47B4D0038A986 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		669C586428A47B4E0038A986 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		669C586928A47B4E0038A986 /* Loop3000.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Loop3000.entitlements; sourceTree = "<group>"; };
-		66E77E5428A54CA300FE6C1E /* AsyncReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AsyncReader.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -70,13 +70,13 @@
 				669C586428A47B4E0038A986 /* Assets.xcassets */,
 				669C586028A47B4D0038A986 /* App.swift */,
 				669C586228A47B4D0038A986 /* MainView.swift */,
-				661B751528A47C9800B9C012 /* MusicLibrary.swift */,
-				66E77E5428A54CA300FE6C1E /* AsyncReader.swift */,
+				661B751528A47C9800B9C012 /* Shelf.swift */,
 				66684C7528A7C28800C32BC8 /* ViewModel.swift */,
 				66684C7728A7FC6700C32BC8 /* DiscoverView.swift */,
 				66684C7B28A823A500C32BC8 /* SidebarView.swift */,
 				6604F69E28A90F4400B84549 /* PlaylistView.swift */,
 				6604F6A028A92BF900B84549 /* PlayerView.swift */,
+				662C8ABF28AF8C5C003983FE /* Util.swift */,
 			);
 			path = Loop3000;
 			sourceTree = "<group>";
@@ -97,6 +97,8 @@
 			dependencies = (
 			);
 			name = Loop3000;
+			packageProductDependencies = (
+			);
 			productName = Loop3000;
 			productReference = 669C585D28A47B4D0038A986 /* Loop3000.app */;
 			productType = "com.apple.product-type.application";
@@ -125,6 +127,8 @@
 				Base,
 			);
 			mainGroup = 669C585428A47B4D0038A986;
+			packageReferences = (
+			);
 			productRefGroup = 669C585E28A47B4D0038A986 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -154,9 +158,9 @@
 				66684C7628A7C28800C32BC8 /* ViewModel.swift in Sources */,
 				6604F69F28A90F4400B84549 /* PlaylistView.swift in Sources */,
 				669C586328A47B4D0038A986 /* MainView.swift in Sources */,
-				66E77E5528A54CA400FE6C1E /* AsyncReader.swift in Sources */,
-				661B751628A47C9900B9C012 /* MusicLibrary.swift in Sources */,
+				661B751628A47C9900B9C012 /* Shelf.swift in Sources */,
 				669C586128A47B4D0038A986 /* App.swift in Sources */,
+				662C8AC028AF8C5C003983FE /* Util.swift in Sources */,
 				66684C7C28A823A500C32BC8 /* SidebarView.swift in Sources */,
 				66684C7828A7FC6700C32BC8 /* DiscoverView.swift in Sources */,
 			);

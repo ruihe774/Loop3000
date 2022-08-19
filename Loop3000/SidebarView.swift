@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct SidebarMaterial: NSViewRepresentable {
+fileprivate struct SidebarMaterial: NSViewRepresentable {
     func makeNSView(context _: Self.Context) -> NSView {
         let visualEffect = NSVisualEffectView()
         visualEffect.material = .sidebar
@@ -9,17 +9,16 @@ struct SidebarMaterial: NSViewRepresentable {
     func updateNSView(_: NSView, context _: Context) {}
 }
 
-extension Album {
-    var title: String? {
-        get {
-            metadata[MetadataCommonKey.title]
-        }
-    }
-}
-
 struct Sidebar: View {
-    @EnvironmentObject var model: ViewModel
-    @State var filterString = ""
+    @EnvironmentObject private var model: ViewModel
+
+    @State private var filterString = ""
+
+    private enum ListType {
+        case Albums
+        case Playlists
+    }
+    @State private var listType = ListType.Albums
 
     var body: some View {
         VStack {
@@ -40,31 +39,31 @@ struct Sidebar: View {
                 .padding(.bottom, 10)
             HStack(spacing: 15) {
                 Button {
-                    model.sidebarListType = .Albums
+                    listType = .Albums
                 } label: {
-                    Image(systemName: model.sidebarListType == .Albums ? "opticaldisc.fill" : "opticaldisc")
+                    Label("Albums", systemImage: listType == .Albums ? "opticaldisc.fill" : "opticaldisc")
+                        .labelStyle(.iconOnly)
                 }
-                .help("Albums")
-                .foregroundColor(model.sidebarListType == .Albums ? .accentColor : .secondary)
+                .foregroundColor(listType == .Albums ? .accentColor : .secondary)
                 .buttonStyle(.borderless)
                 Button {
-                    model.sidebarListType = .Playlists
+                    listType = .Playlists
                 } label: {
-                    Image(systemName: "music.note.list")
+                    Label("Playlists", systemImage: "music.note.list")
+                        .labelStyle(.iconOnly)
                 }
-                .help("Playlists")
-                .foregroundColor(model.sidebarListType == .Playlists ? .accentColor : .secondary)
+                .foregroundColor(listType == .Playlists ? .accentColor : .secondary)
                 .buttonStyle(.borderless)
             }
             .font(.title2)
             ScrollView {
                 LazyVStack(spacing: -4) {
                     ForEach(
-                        model.sidebarListType == .Albums ? model.musicLibrary.albumPlaylists : model.musicLibrary.manualPlaylists
-                    ) {playlist in
-                        let selected = model.selectedList == playlist.id
+                        listType == .Albums ? model.musicLibrary.albumPlaylists : model.musicLibrary.manualPlaylists
+                    ) { playlist in
+                        let selected = model.selectedList == playlist
                         Button {
-                            model.selectedList = playlist.id
+                            model.selectedList = playlist
                         } label: {
                             HStack {
                                 Text(playlist.title)
@@ -86,5 +85,9 @@ struct Sidebar: View {
         .padding([.top, .bottom], 30)
         .frame(width: 300)
         .background(SidebarMaterial())
+        .onAppear {
+            guard let selectedList = model.selectedList else { return }
+            listType = model.musicLibrary.albumPlaylists.contains(selectedList) ? .Albums : .Playlists
+        }
     }
 }
