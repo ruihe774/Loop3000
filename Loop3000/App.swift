@@ -1,8 +1,22 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+class AppDelegate: NSObject, NSApplicationDelegate {
+    fileprivate var model: ViewModel?
+
+    func applicationDidHide(_ notification: Notification) {
+        model?.windowIsHidden = true
+    }
+
+    func applicationWillUnhide(_ notification: Notification) {
+        model?.windowIsHidden = false
+    }
+}
+
 @main
 struct Loop3000App: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
     @StateObject private var model = ViewModel()
 
     var body: some Scene {
@@ -18,6 +32,7 @@ struct Loop3000App: App {
             .edgesIgnoringSafeArea(.all)
             .onAppear {
                 model.musicLibrary.syncWithStorage()
+                appDelegate.model = model
             }
         }
         .windowStyle(.hiddenTitleBar)

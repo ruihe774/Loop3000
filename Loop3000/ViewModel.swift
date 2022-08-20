@@ -231,6 +231,8 @@ enum ShowView {
 }
 
 class ViewModel: ObservableObject {
+    @Published var windowIsHidden = false
+
     @Published private(set) var musicLibrary = MusicLibrary()
     @Published var libraryCommands = LibraryCommands()
     @Published var alertModel = AlertModel()
