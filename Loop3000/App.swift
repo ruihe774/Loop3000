@@ -31,13 +31,7 @@ struct Loop3000App: App {
                     isPresented: $model.libraryCommands.showFileAdder,
                     allowedContentTypes: model.musicLibrary.canImportTypes
                 ) { result in
-                    guard let url = try? result.get() else { return }
-                    let type = UTType(filenameExtension: url.pathExtension)!
-                    if type.conforms(to: .audio) {
-                        model.musicLibrary.performScanMedia(at: url)
-                    } else {
-                        model.alert(title: "Add File", message: "Please use “Add Folder” to add the whole album.")
-                    }
+                    (try? result.get()).map { model.musicLibrary.performScanMedia(at: $0) }
                 }
                 Button("Add Folder") {
                     model.libraryCommands.showFolderAdder = true

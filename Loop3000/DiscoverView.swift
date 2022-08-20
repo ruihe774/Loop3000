@@ -87,7 +87,7 @@ struct DiscoverView: View {
                         let description = (error as CustomStringConvertible).description
                         Text(description)
                     }
-                    .frame(height: 100)
+                    .frame(idealHeight: 100)
                 }
                 HStack {
                     Spacer()

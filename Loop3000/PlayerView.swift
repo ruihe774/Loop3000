@@ -1,9 +1,15 @@
 import SwiftUI
+import Combine
 
 struct PlayerView: View {
     @EnvironmentObject private var model: ViewModel
 
-    @State private var sliderValue = 0.0
+    private var ac: [any Cancellable] = []
+
+    private var currentTimestampString: String {
+        let description = model.currentTimestamp.description
+        return String(description[..<description.index(description.startIndex, offsetBy: 5)])
+    }
 
     var body: some View {
         HStack {
@@ -22,11 +28,12 @@ struct PlayerView: View {
                     model.resume()
                 }
             } label: {
-                (model.playing ? Label("Pause", systemImage: "pause.fill") : Label("Play", systemImage: "play.fill"))
+                (model.playing && !model.paused ? Label("Pause", systemImage: "pause.fill") : Label("Play", systemImage: "play.fill"))
                     .labelStyle(.iconOnly)
             }
             .font(.largeTitle)
             .buttonStyle(.borderless)
+            .frame(width: 25)
             Button {
                 model.playNext()
             } label: {
@@ -35,8 +42,11 @@ struct PlayerView: View {
             }
             .font(.title2)
             .buttonStyle(.borderless)
-            Spacer(minLength: 15)
-            Slider(value: $sliderValue, in: 0 ... 1)
+            Text(currentTimestampString)
+                .padding([.leading, .trailing], 5)
+                .font(.body.monospacedDigit())
+            Slider(value: $model.playerSliderValue, in: 0 ... 1)
+                .disabled(!model.playing && !model.paused)
         }
         .frame(height: 27)
         .scenePadding([.leading, .trailing])

@@ -102,6 +102,10 @@ fileprivate struct PlaylistItemView: View {
         viewItem.playlistItem != nil && model.playing && model.playingItem == viewItem.playlistItem
     }
 
+    private var currentPausd: Bool {
+        viewItem.playlistItem != nil && model.paused && model.playingItem == viewItem.playlistItem
+    }
+
     init(_ viewItem: PlaylistViewItem) {
         self.viewItem = viewItem
     }
@@ -111,13 +115,18 @@ fileprivate struct PlaylistItemView: View {
             RoundedRectangle(cornerRadius: 5)
                 .fill(selected ? Color(nsColor: .quaternaryLabelColor) : Color.black.opacity(0.001))
             HStack {
-                Label("Playing", systemImage: "play.fill")
-                    .foregroundColor(currentPlaying ? .secondary : .clear)
+                (currentPlaying || currentPausd ?
+                    Label(currentPausd ? "Paused" : "Playing", systemImage: currentPausd ? "pause.fill" : "play.fill")
+                    .foregroundColor(.secondary) :
+                    Label("Item", systemImage: "list.bullet")
+                    .foregroundColor(.clear))
                     .labelStyle(.iconOnly)
+                    .frame(width: 10)
                 Text(viewItem.indexString ?? "")
                     .font(.body.monospacedDigit())
                     .frame(width: 30)
                 Text(viewItem.combinedTitle)
+                    .help(viewItem.combinedTitle)
                     .scaledToFit()
                 Spacer()
                 Text(viewItem.duration ?? "")

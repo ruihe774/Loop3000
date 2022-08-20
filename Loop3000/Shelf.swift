@@ -802,13 +802,28 @@ fileprivate class AVGrabber: MetadataGrabber {
     }
 }
 
+extension Timestamp {
+    func toSample(atRate rate: Int) -> Int {
+        value * rate / Self.timescale
+    }
+}
+
+extension CMTime {
+    func toSample(atRate rate: Int) -> Int {
+        Int(convertScale(Int32(rate), method: .default).value)
+    }
+}
+
 protocol AudioDecoder {
     static var supportedTypes: [UTType] { get }
 
     init(track: Track) throws
+
+    func nextSampleBuffer() throws -> CMSampleBuffer?
+    func seek(to time: CMTime)
 }
 
-var audioDecoders: [any AudioDecoder.Type] = []
+var audioDecoders: [AudioDecoder.Type] = [AVDecoder.self]
 
 struct NoApplicableDecoder: Error {
     let url: URL
@@ -822,4 +837,241 @@ func makeAudioDecoder(for track: Track) throws -> any AudioDecoder {
         throw NoApplicableDecoder(url: track.source)
     }
     return try decoderType.init(track: track)
+}
+
+class AVDecoder: AudioDecoder {
+    static let supportedTypes = [UTType.audio]
+
+    private let file: AVAudioFile
+    private let endSample: Int
+
+    static let maxFrameCount = 0x10000
+
+    required init(track: Track) throws {
+        file = try AVAudioFile(forReading: track.source, commonFormat: .pcmFormatFloat32, interleaved: true)
+        let sampleRate = Int(exactly: file.processingFormat.sampleRate)!
+        file.framePosition = AVAudioFramePosition(track.start.toSample(atRate: sampleRate))
+        endSample = min(track.end.toSample(atRate: sampleRate), Int(file.length))
+    }
+
+    func seek(to time: CMTime) {
+        file.framePosition = AVAudioFramePosition(time.toSample(atRate: sampleRate))
+    }
+
+    func nextSampleBuffer() throws -> CMSampleBuffer? {
+        let remainingFrames = endSample - Int(file.framePosition)
+        let requestingFrames = min(remainingFrames, Self.maxFrameCount)
+        guard requestingFrames > 0 else { return nil }
+        let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(requestingFrames))!
+        try file.read(into: buffer)
+        return try makeSampleBuffer(from: buffer)
+    }
+
+    private var sampleRate: Int {
+        Int(exactly: file.processingFormat.sampleRate)!
+    }
+}
+
+class PlaybackScheduler {
+    private let renderer = AVSampleBufferAudioRenderer()
+    private let synchronizer = AVSampleBufferRenderSynchronizer()
+    private let playbackQueue = DispatchQueue(label: "PlaybackScheduler.playback", qos: .userInteractive)
+
+    var requestNextHandler: (Track?) -> Track? = { _ in nil }
+
+    private var current: (Track, AudioDecoder)?
+    private var next: (Track, AudioDecoder)?
+    private var bufferedUntil = CMTime.zero
+    private var trailingUntil = CMTime.invalid
+    private var bufferedForCurrentTrack = CMTime.zero
+    private var bufferedForNextTrack = CMTime.zero
+
+    var playing: Bool {
+        if synchronizer.rate == 0 {
+            return false
+        }
+        return synchronizer.currentTime() < bufferedUntil
+    }
+
+    var currentTrack: Track? {
+        guard let current else { return nil }
+        guard trailingUntil != .invalid else { return current.0 }
+        if synchronizer.currentTime() >= trailingUntil {
+            return next?.0
+        } else {
+            return current.0
+        }
+    }
+
+    var currentTimestamp: Timestamp {
+        let time = (trailingUntil != .invalid && synchronizer.currentTime() >= trailingUntil
+                    ? bufferedForNextTrack : bufferedForCurrentTrack) + (self.synchronizer.currentTime() - bufferedUntil)
+        return Timestamp(from: max(time, .zero))
+    }
+
+    init() {
+        synchronizer.addRenderer(renderer)
+    }
+
+    private func playbackLoop() {
+        while self.renderer.isReadyForMoreMediaData {
+            let currentTime = self.synchronizer.currentTime()
+            var freshStart = false
+            var useCurrent = false
+            if trailingUntil != .invalid {
+                if next == nil {
+                    guard let track = self.requestNextHandler(current?.0) else {
+                        self.renderer.stopRequestingMediaData()
+                        return
+                    }
+                    let decoder = try! makeAudioDecoder(for: track)
+                    next = (track, decoder)
+                }
+                if currentTime >= trailingUntil {
+                    current = next
+                    next = nil
+                    trailingUntil = .invalid
+                    bufferedForCurrentTrack = bufferedForNextTrack
+                    bufferedForNextTrack = .zero
+                    useCurrent = true
+                }
+            } else {
+                if current == nil {
+                    if next != nil {
+                        current = next
+                        next = nil
+                        bufferedForCurrentTrack = bufferedForNextTrack
+                        bufferedForNextTrack = .zero
+                    } else {
+                        guard let track = self.requestNextHandler(nil) else {
+                            self.renderer.stopRequestingMediaData()
+                            return
+                        }
+                        let decoder = try! makeAudioDecoder(for: track)
+                        current = (track, decoder)
+                        freshStart = true
+                    }
+                }
+                useCurrent = true
+            }
+            let decoder = useCurrent ? current!.1 : next!.1
+            bufferedUntil = max(bufferedUntil, currentTime + (freshStart ? CMTime(value: 1, timescale: 3) : CMTime(value: 1, timescale: 100)))
+            if let buffer = try! decoder.nextSampleBuffer() {
+                let duration = CMSampleBufferGetDuration(buffer)
+                CMSampleBufferSetOutputPresentationTimeStamp(buffer, newValue: bufferedUntil)
+                self.renderer.enqueue(buffer)
+                bufferedUntil = bufferedUntil + duration
+                if useCurrent {
+                    bufferedForCurrentTrack = bufferedForCurrentTrack + duration
+                } else {
+                    bufferedForNextTrack = bufferedForNextTrack + duration
+                }
+            } else if trailingUntil == .invalid {
+                trailingUntil = bufferedUntil
+            } else {
+                Thread.sleep(forTimeInterval: 0.1)
+            }
+        }
+    }
+
+    func play() {
+        playbackQueue.sync {
+            self.synchronizer.rate = 1
+            self.renderer.stopRequestingMediaData()
+            self.renderer.requestMediaDataWhenReady(on: playbackQueue) { [unowned self] in
+                self.playbackLoop()
+            }
+        }
+    }
+
+    func pause() {
+        playbackQueue.sync {
+            self.synchronizer.rate = 0
+        }
+    }
+
+    func stop() {
+        playbackQueue.sync {
+            self.renderer.stopRequestingMediaData()
+            self.renderer.flush()
+            self.synchronizer.rate = 0
+            self.current = nil
+            self.next = nil
+            self.bufferedUntil = .zero
+            self.trailingUntil = .invalid
+            self.bufferedForCurrentTrack = .zero
+            self.bufferedForNextTrack = .zero
+        }
+    }
+}
+
+fileprivate func makeSampleBuffer(from audioListBuffer: AVAudioPCMBuffer) throws -> CMSampleBuffer {
+
+    let blockBuffer = try makeBlockBuffer(from: audioListBuffer)
+
+    var sampleBuffer: CMSampleBuffer? = nil
+
+    let err = CMAudioSampleBufferCreateReadyWithPacketDescriptions(
+        allocator: kCFAllocatorDefault,
+        dataBuffer: blockBuffer,
+        formatDescription: audioListBuffer.format.formatDescription,
+        sampleCount: CMItemCount(audioListBuffer.frameLength),
+        presentationTimeStamp: .zero,
+        packetDescriptions: nil,
+        sampleBufferOut: &sampleBuffer)
+
+    guard err == noErr else {
+        throw NSError(domain: NSOSStatusErrorDomain, code: Int(err))
+    }
+
+    return sampleBuffer!
+}
+
+fileprivate func makeBlockBuffer(from audioListBuffer: AVAudioPCMBuffer) throws -> CMBlockBuffer {
+
+    var status: OSStatus
+    var outBlockListBuffer: CMBlockBuffer? = nil
+
+    status = CMBlockBufferCreateEmpty(allocator: kCFAllocatorDefault, capacity: 0, flags: 0, blockBufferOut: &outBlockListBuffer)
+    guard status == noErr else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(status)) }
+    guard let blockListBuffer = outBlockListBuffer else { throw NSError(domain: NSOSStatusErrorDomain, code: -1) }
+
+    for audioBuffer in UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: audioListBuffer.audioBufferList)) {
+
+        var outBlockBuffer: CMBlockBuffer? = nil
+        let dataByteSize = Int(audioBuffer.mDataByteSize)
+
+        status = CMBlockBufferCreateWithMemoryBlock(
+            allocator: kCFAllocatorDefault,
+            memoryBlock: nil,
+            blockLength: dataByteSize,
+            blockAllocator: kCFAllocatorDefault,
+            customBlockSource: nil,
+            offsetToData: 0,
+            dataLength: dataByteSize,
+            flags: kCMBlockBufferAssureMemoryNowFlag,
+            blockBufferOut: &outBlockBuffer)
+
+        guard status == noErr else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(status)) }
+        guard let blockBuffer = outBlockBuffer else { throw NSError(domain: NSOSStatusErrorDomain, code: -1) }
+
+        status = CMBlockBufferReplaceDataBytes(
+            with: audioBuffer.mData!,
+            blockBuffer: blockBuffer,
+            offsetIntoDestination: 0,
+            dataLength: dataByteSize)
+
+        guard status == noErr else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(status)) }
+
+        status = CMBlockBufferAppendBufferReference(
+            blockListBuffer,
+            targetBBuf: blockBuffer,
+            offsetToData: 0,
+            dataLength: CMBlockBufferGetDataLength(blockBuffer),
+            flags: 0)
+
+        guard status == noErr else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(status)) }
+    }
+
+    return blockListBuffer
 }

@@ -197,7 +197,7 @@ class MusicLibrary: ObservableObject {
             let decoder = PropertyListDecoder()
             shelf = try! decoder.decode(Shelf.self, from: data)
         }
-        let syncQueue = DispatchQueue(label: "MusicLibrary.sync")
+        let syncQueue = DispatchQueue(label: "MusicLibrary.sync", qos: .utility)
         ac.append($shelf
             .sink { shelf in
                 syncQueue.async {
@@ -242,8 +242,13 @@ class ViewModel: ObservableObject {
     @Published private(set) var playingList: Playlist?
     @Published var selectedItem: PlaylistItem?
     @Published private(set) var playingItem: PlaylistItem?
-    @Published private(set) var nextItem: PlaylistItem?
     @Published private(set) var playing = false
+    @Published private(set) var paused = false
+    @Published private(set) var currentTimestamp = Timestamp.zero
+
+    @Published var playerSliderValue = 0.0
+
+    private var player = PlaybackScheduler()
 
     private var ac: [any Cancellable] = []
 
@@ -271,14 +276,56 @@ class ViewModel: ObservableObject {
             .compactMap { $0 }
             .assign(to: &$selectedItem)
 
-        Publishers.CombineLatest($playingList, $playingItem)
-            .compactMap { $0.0 != nil && $0.1 != nil ? ($0.0!, $0.1!) : nil }
-            .compactMap { (list, item) in
-                guard let index = list.items.firstIndex(of: item) else { return nil }
-                guard index < list.items.count - 1 else { return nil }
-                return list.items[index + 1]
+        $playing
+            .compactMap { $0 ? false : nil }
+            .assign(to: &$paused)
+
+        player.requestNextHandler = { [unowned self] track in
+            guard let track else {
+                return (self.playingItem?.trackId).map { self.musicLibrary.getTrack(by: $0) }
             }
-            .assign(to: &$nextItem)
+            guard let index = self.playingItem.flatMap({ self.playingList?.items.firstIndex(of: $0) }) else {
+                return nil
+            }
+            guard let prevIndex = self.playingList!.items[index...].firstIndex(where: { $0.trackId == track.id }) else {
+                return nil
+            }
+            guard prevIndex < self.playingList!.items.count - 1 else {
+                return nil
+            }
+            return self.musicLibrary.getTrack(by: self.playingList!.items[prevIndex + 1].trackId)
+        }
+
+        ac.append(Timer.publish(every: 0.25, on: .main, in: .default)
+            .autoconnect()
+            .sink { [unowned self] _ in
+                let playing = self.player.playing
+                guard self.playing != playing || playing else {
+                    return
+                }
+                self.playing = playing
+                guard let currentTrack = self.player.currentTrack else {
+                    return
+                }
+                guard let index = self.playingItem.flatMap({ self.playingList?.items.firstIndex(of: $0) }) else {
+                    return
+                }
+                guard let currentItem = self.playingList!.items[index...].first(
+                    where: { $0.trackId == currentTrack.id }
+                ) else {
+                    return
+                }
+                playingItem = currentItem
+                self.currentTimestamp = self.player.currentTimestamp
+            }
+        )
+
+        $currentTimestamp
+            .map { [unowned self] timestamp in
+                guard let track = self.playingItem.map({ self.musicLibrary.getTrack(by: $0.trackId) }) else { return 0.0 }
+                return Double(timestamp.value) / Double(track.end.value - track.start.value)
+            }
+            .assign(to: &$playerSliderValue)
     }
 
     func alert(title: String, message: String) {
@@ -293,17 +340,45 @@ class ViewModel: ObservableObject {
     }
 
     func play(_ item: PlaylistItem) {
+        self.playingList = self.musicLibrary.getPlaylist(for: item)
+        self.playingItem = item
+        self.player.stop()
+        self.player.play()
     }
 
     func pause() {
+        self.paused = true
+        self.player.pause()
+    }
 
+    func stop() {
+        self.player.stop()
+        self.paused = false
+        self.playingList = nil
+        self.playingItem = nil
     }
 
     func resume() {
-
+        if playingItem != nil {
+            self.player.play()
+        } else {
+            (playingList ?? selectedList)
+                .flatMap { $0.items.first }
+                .map { self.play($0) }
+        }
     }
 
-    func playPrevious() {}
+    func playPrevious() {
+        guard let playingItem, let playingList else { return }
+        guard let index = playingList.items.firstIndex(of: playingItem) else { return }
+        guard index > 0 else { return }
+        play(playingList.items[index - 1])
+    }
 
-    func playNext() {}
+    func playNext() {
+        guard let playingItem, let playingList else { return }
+        guard let index = playingList.items.firstIndex(of: playingItem) else { return }
+        guard index < playingList.items.count - 1 else { return }
+        play(playingList.items[index + 1])
+    }
 }

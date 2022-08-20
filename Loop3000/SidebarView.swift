@@ -67,6 +67,7 @@ struct Sidebar: View {
                         } label: {
                             HStack {
                                 Text(playlist.title)
+                                    .help(playlist.title)
                                     .foregroundColor(.primary)
                                     .scaledToFit()
                                 Spacer()
