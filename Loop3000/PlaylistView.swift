@@ -1,7 +1,7 @@
 import SwiftUI
 
 fileprivate struct PlaylistViewItem: Unicorn {
-    let id = UUID()
+    let id: UUID
     let track: Track
     let album: Album
     let playlistItem: PlaylistItem?
@@ -77,6 +77,14 @@ fileprivate struct PlaylistViewItem: Unicorn {
         let s = Timestamp(value: track.end.value - track.start.value).description
         return String(s[..<s.index(s.startIndex, offsetBy: 5)])
     }
+
+    init(track: Track, album: Album, playlistItem: PlaylistItem?, playlist: Playlist?) {
+        self.id = playlistItem?.id ?? track.id
+        self.track = track
+        self.album = album
+        self.playlistItem = playlistItem
+        self.playlist = playlist
+    }
 }
 
 fileprivate struct PlaylistItemView: View {
@@ -136,11 +144,12 @@ struct PlaylistView: View {
     @EnvironmentObject private var model: ViewModel
 
     private struct SectionItem: Identifiable {
-        let id = UUID()
+        let id: UUID
         let album: Album
         var items: [PlaylistViewItem]
 
         init(album: Album, items: [PlaylistViewItem]) {
+            self.id = items.first!.id
             self.album = album
             self.items = items
         }

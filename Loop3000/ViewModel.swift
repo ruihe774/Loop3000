@@ -242,6 +242,7 @@ class ViewModel: ObservableObject {
     @Published private(set) var playingList: Playlist?
     @Published var selectedItem: PlaylistItem?
     @Published private(set) var playingItem: PlaylistItem?
+    @Published private(set) var nextItem: PlaylistItem?
     @Published private(set) var playing = false
 
     private var ac: [any Cancellable] = []
@@ -267,7 +268,17 @@ class ViewModel: ObservableObject {
             .assign(to: &$currentView)
 
         $playingItem
+            .compactMap { $0 }
             .assign(to: &$selectedItem)
+
+        Publishers.CombineLatest($playingList, $playingItem)
+            .compactMap { $0.0 != nil && $0.1 != nil ? ($0.0!, $0.1!) : nil }
+            .compactMap { (list, item) in
+                guard let index = list.items.firstIndex(of: item) else { return nil }
+                guard index < list.items.count - 1 else { return nil }
+                return list.items[index + 1]
+            }
+            .assign(to: &$nextItem)
     }
 
     func alert(title: String, message: String) {
@@ -282,7 +293,6 @@ class ViewModel: ObservableObject {
     }
 
     func play(_ item: PlaylistItem) {
-
     }
 
     func pause() {

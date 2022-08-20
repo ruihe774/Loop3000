@@ -801,3 +801,25 @@ fileprivate class AVGrabber: MetadataGrabber {
         return metadata
     }
 }
+
+protocol AudioDecoder {
+    static var supportedTypes: [UTType] { get }
+
+    init(track: Track) throws
+}
+
+var audioDecoders: [any AudioDecoder.Type] = []
+
+struct NoApplicableDecoder: Error {
+    let url: URL
+}
+
+func makeAudioDecoder(for track: Track) throws -> any AudioDecoder {
+    let type = UTType(filenameExtension: track.source.pathExtension)!
+    guard let decoderType = audioDecoders.first(where: { decoder in
+        decoder.supportedTypes.contains { type.conforms(to: $0) }
+    }) else {
+        throw NoApplicableDecoder(url: track.source)
+    }
+    return try decoderType.init(track: track)
+}
