@@ -67,13 +67,13 @@ struct DiscoverView: View {
                         Divider()
                         PlaylistView(tracks: sortedImportedTracks)
                     } else {
-                        Spacer()
+                        Spacer(minLength: 50)
                         HStack {
                             Spacer()
                             Text("Your music library is up to date.")
                             Spacer()
                         }
-                        Spacer()
+                        Spacer(minLength: 50)
                     }
                 }
                 Divider()

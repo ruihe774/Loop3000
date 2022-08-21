@@ -271,7 +271,8 @@ class ViewModel: ObservableObject {
             .assign(to: &$currentView)
 
         $selectedList
-            .compactMap { $0 != nil ? .Playlist : nil }
+            .withPrevious()
+            .compactMap { $0.1 != nil && $0.0??.id != $0.1!.id ? .Playlist : nil }
             .assign(to: &$currentView)
 
         $playingItem

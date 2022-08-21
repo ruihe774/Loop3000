@@ -148,3 +148,16 @@ struct FileNotFound: Error, CustomStringConvertible {
         "File not found: '\(pathDescription)'"
     }
 }
+
+func makeMonotonicUUID() -> UUID {
+    let time = UInt64(Date.timeIntervalSinceReferenceDate * 1_000_000)
+    let random = UInt64.random(in: 0 ... UInt64.max)
+    var data = Data(count: 16)
+    let uuid = data.withUnsafeMutableBytes { ptr in
+        let array = ptr.assumingMemoryBound(to: UInt64.self)
+        array[0] = time.bigEndian
+        array[1] = random
+        return NSUUID(uuidBytes: ptr.baseAddress)
+    }
+    return uuid as UUID
+}

@@ -143,7 +143,7 @@ struct MetadataCommonKey {
 }
 
 class Album: Unicorn, Codable {
-    private(set) var id = UUID()
+    private(set) var id = makeMonotonicUUID()
     var metadata = Metadata()
 }
 
@@ -511,7 +511,7 @@ func mergeShelf(_ a: Shelf, _ b: Shelf) -> Shelf {
 }
 
 fileprivate func mergeTracks(_ a: Track, _ b: Track) -> Track? {
-    guard a.source == b.source else { return nil }
+    guard a.source.absoluteURL == b.source.absoluteURL else { return nil }
     guard abs(a.start.value - b.start.value) < 500 || !a.start.isValid || !b.start.isValid else { return nil }
     guard abs(a.end.value - b.end.value) < 500 || !a.end.isValid || !b.end.isValid else { return nil }
     let durationA = a.start.isValid && a.end.isValid ? a.end.value - a.start.value : .max
