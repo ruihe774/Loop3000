@@ -824,7 +824,7 @@ protocol AudioDecoder {
     func seek(to time: CMTime)
 }
 
-var audioDecoders: [AudioDecoder.Type] = [AVDecoder.self]
+var audioDecoders: [AudioDecoder.Type] = [FLACDecoder.self, AVDecoder.self]
 
 struct NoApplicableDecoder: Error {
     let url: URL
@@ -838,39 +838,6 @@ func makeAudioDecoder(for track: Track) throws -> any AudioDecoder {
         throw NoApplicableDecoder(url: track.source)
     }
     return try decoderType.init(track: track)
-}
-
-class AVDecoder: AudioDecoder {
-    static let supportedTypes = [UTType.audio]
-
-    private let file: AVAudioFile
-    private let endSample: Int
-
-    static let maxFrameCount = 0x10000
-
-    required init(track: Track) throws {
-        file = try AVAudioFile(forReading: track.source, commonFormat: .pcmFormatFloat32, interleaved: true)
-        let sampleRate = Int(exactly: file.processingFormat.sampleRate)!
-        file.framePosition = AVAudioFramePosition(track.start.toSample(atRate: sampleRate))
-        endSample = min(track.end.toSample(atRate: sampleRate), Int(file.length))
-    }
-
-    func seek(to time: CMTime) {
-        file.framePosition = AVAudioFramePosition(time.toSample(atRate: sampleRate))
-    }
-
-    func nextSampleBuffer() throws -> CMSampleBuffer? {
-        let remainingFrames = endSample - Int(file.framePosition)
-        let requestingFrames = min(remainingFrames, Self.maxFrameCount)
-        guard requestingFrames > 0 else { return nil }
-        let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(requestingFrames))!
-        try file.read(into: buffer)
-        return try makeSampleBuffer(from: buffer)
-    }
-
-    private var sampleRate: Int {
-        Int(exactly: file.processingFormat.sampleRate)!
-    }
 }
 
 class PlaybackScheduler {
@@ -1012,73 +979,188 @@ class PlaybackScheduler {
     }
 }
 
-fileprivate func makeSampleBuffer(from audioListBuffer: AVAudioPCMBuffer) throws -> CMSampleBuffer {
+class AVDecoder: AudioDecoder {
+    static let supportedTypes = [UTType.audio]
 
-    let blockBuffer = try makeBlockBuffer(from: audioListBuffer)
+    private let file: AVAudioFile
+    private let startSample: Int
+    private let endSample: Int
 
-    var sampleBuffer: CMSampleBuffer? = nil
+    static let maxFrameCount = 0x1000
 
-    let err = CMAudioSampleBufferCreateReadyWithPacketDescriptions(
-        allocator: kCFAllocatorDefault,
-        dataBuffer: blockBuffer,
-        formatDescription: audioListBuffer.format.formatDescription,
-        sampleCount: CMItemCount(audioListBuffer.frameLength),
-        presentationTimeStamp: .zero,
-        packetDescriptions: nil,
-        sampleBufferOut: &sampleBuffer)
-
-    guard err == noErr else {
-        throw NSError(domain: NSOSStatusErrorDomain, code: Int(err))
+    required init(track: Track) throws {
+        file = try AVAudioFile(forReading: track.source, commonFormat: .pcmFormatFloat32, interleaved: true)
+        let sampleRate = Int(exactly: file.processingFormat.sampleRate)!
+        startSample = track.start.toSample(atRate: sampleRate)
+        endSample = min(track.end.toSample(atRate: sampleRate), Int(file.length))
+        seek(to: .zero)
     }
 
-    return sampleBuffer!
+    func seek(to time: CMTime) {
+        var targetSample = time.toSample(atRate: sampleRate)
+        targetSample += startSample
+        targetSample = min(targetSample, endSample)
+        file.framePosition = AVAudioFramePosition(targetSample)
+    }
+
+    func nextSampleBuffer() throws -> CMSampleBuffer? {
+        let remainingFrames = endSample - Int(file.framePosition)
+        let requestingFrames = min(remainingFrames, Self.maxFrameCount)
+        guard requestingFrames > 0 else { return nil }
+        let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(requestingFrames))!
+        try file.read(into: buffer)
+        let blockListBuffer = try CMBlockBuffer()
+        for audioBuffer in UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: buffer.audioBufferList)) {
+            let dataByteSize = Int(audioBuffer.mDataByteSize)
+            let blockBuffer = try CMBlockBuffer(length: dataByteSize)
+            try blockBuffer.replaceDataBytes(
+                with: UnsafeRawBufferPointer(start: audioBuffer.mData!, count: Int(audioBuffer.mDataByteSize))
+            )
+            try blockListBuffer.append(bufferReference: blockBuffer)
+        }
+        return try CMSampleBuffer(
+            dataBuffer: blockListBuffer,
+            formatDescription: buffer.format.formatDescription,
+            numSamples: CMItemCount(buffer.frameLength),
+            presentationTimeStamp: .zero,
+            packetDescriptions: []
+        )
+    }
+
+    private var sampleRate: Int {
+        Int(exactly: file.processingFormat.sampleRate)!
+    }
 }
 
-fileprivate func makeBlockBuffer(from audioListBuffer: AVAudioPCMBuffer) throws -> CMBlockBuffer {
+class FLACDecoder: AudioDecoder {
+    static let supportedTypes = [UTType("org.xiph.flac")!]
 
-    var status: OSStatus
-    var outBlockListBuffer: CMBlockBuffer? = nil
+    private let decoder: UnsafeMutablePointer<FLAC__StreamDecoder>
+    private let source: URL
+    private var error: Error?
+    private var buffer: CMSampleBuffer?
+    private var sampleRate: Int
+    private var startSample: Int
+    private var endSample: Int
+    private var currentSample: Int
+    private var seeking = false
 
-    status = CMBlockBufferCreateEmpty(allocator: kCFAllocatorDefault, capacity: 0, flags: 0, blockBufferOut: &outBlockListBuffer)
-    guard status == noErr else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(status)) }
-    guard let blockListBuffer = outBlockListBuffer else { throw NSError(domain: NSOSStatusErrorDomain, code: -1) }
-
-    for audioBuffer in UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: audioListBuffer.audioBufferList)) {
-
-        var outBlockBuffer: CMBlockBuffer? = nil
-        let dataByteSize = Int(audioBuffer.mDataByteSize)
-
-        status = CMBlockBufferCreateWithMemoryBlock(
-            allocator: kCFAllocatorDefault,
-            memoryBlock: nil,
-            blockLength: dataByteSize,
-            blockAllocator: kCFAllocatorDefault,
-            customBlockSource: nil,
-            offsetToData: 0,
-            dataLength: dataByteSize,
-            flags: kCMBlockBufferAssureMemoryNowFlag,
-            blockBufferOut: &outBlockBuffer)
-
-        guard status == noErr else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(status)) }
-        guard let blockBuffer = outBlockBuffer else { throw NSError(domain: NSOSStatusErrorDomain, code: -1) }
-
-        status = CMBlockBufferReplaceDataBytes(
-            with: audioBuffer.mData!,
-            blockBuffer: blockBuffer,
-            offsetIntoDestination: 0,
-            dataLength: dataByteSize)
-
-        guard status == noErr else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(status)) }
-
-        status = CMBlockBufferAppendBufferReference(
-            blockListBuffer,
-            targetBBuf: blockBuffer,
-            offsetToData: 0,
-            dataLength: CMBlockBufferGetDataLength(blockBuffer),
-            flags: 0)
-
-        guard status == noErr else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(status)) }
+    struct AudioDecodingError: Error {
+        let url: URL
     }
 
-    return blockListBuffer
+    required init(track: Track) throws {
+        source = track.source
+        startSample = 0
+        endSample = 0
+        currentSample = 0
+        sampleRate = 0
+        let error = AudioDecodingError(url: source)
+        decoder = FLAC__stream_decoder_new()!
+        if track.source.path.utf8CString.withUnsafeBytes({ filename in
+            FLAC__stream_decoder_init_file(decoder, filename.baseAddress!, { decoder, frame, buffer, client in
+                let this = Unmanaged<FLACDecoder>.fromOpaque(client!).takeUnretainedValue()
+                if !this.seeking {
+                    do {
+                        try this.writeCallback(frame: frame!.pointee, buffer: buffer!)
+                    } catch let error {
+                        this.error = error
+                        return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT
+                    }
+                }
+                return FLAC__STREAM_DECODER_WRITE_STATUS_CONTINUE
+            }, { decoder, metadata, client in
+                let this = Unmanaged<FLACDecoder>.fromOpaque(client!).takeUnretainedValue()
+                let streamInfo = metadata!.pointee.data.stream_info
+                this.endSample = Int(streamInfo.total_samples)
+                this.sampleRate = Int(streamInfo.sample_rate)
+            }, { decoder, status, client in
+                let this = Unmanaged<FLACDecoder>.fromOpaque(client!).takeUnretainedValue()
+                this.errorCallback()
+            }, Unmanaged<FLACDecoder>.passUnretained(self).toOpaque())
+        }) != FLAC__STREAM_DECODER_INIT_STATUS_OK {
+            throw error
+        }
+        guard FLAC__stream_decoder_process_until_end_of_metadata(decoder) != 0 else {
+            throw self.error ?? error
+        }
+        startSample = track.start.toSample(atRate: sampleRate)
+        endSample = min(endSample, track.end.toSample(atRate: sampleRate))
+        seek(to: .zero)
+    }
+
+    deinit {
+        FLAC__stream_decoder_delete(decoder)
+    }
+
+    private func writeCallback(frame: FLAC__Frame, buffer: UnsafePointer<UnsafePointer<Int32>?>) throws {
+        precondition(frame.header.channels == 2)
+        let asbd = AudioStreamBasicDescription(
+            mSampleRate: Float64(frame.header.sample_rate),
+            mFormatID: kAudioFormatLinearPCM,
+            mFormatFlags: kAudioFormatFlagsNativeEndian | kAudioFormatFlagIsSignedInteger,
+            mBytesPerPacket: 4 * frame.header.channels,
+            mFramesPerPacket: 1,
+            mBytesPerFrame: 4 * frame.header.channels,
+            mChannelsPerFrame: frame.header.channels,
+            mBitsPerChannel: frame.header.bits_per_sample,
+            mReserved: 0
+        )
+        let description = try CMAudioFormatDescription(audioStreamBasicDescription: asbd)
+        let blocksize = Int(frame.header.blocksize)
+        let channels = Int(frame.header.channels)
+        let totalLength = blocksize * 4 * channels
+        let dataBuffer = CFAllocatorAllocate(kCFAllocatorDefault, totalLength, 0)!
+        let dataArray = dataBuffer.assumingMemoryBound(to: Int32.self)
+        for j in 0 ..< channels {
+            let channelBuffer = buffer[j]!
+            for i in 0 ..< blocksize {
+                dataArray[i * channels + j] = channelBuffer[i]
+            }
+        }
+        let blockBuffer = try CMBlockBuffer(buffer: UnsafeMutableRawBufferPointer(start: dataBuffer, count: totalLength))
+        let sampleBuffer = try CMSampleBuffer(
+            dataBuffer: blockBuffer,
+            formatDescription: description,
+            numSamples: blocksize,
+            presentationTimeStamp: .zero,
+            packetDescriptions: []
+        )
+        self.buffer = sampleBuffer
+        let previousSample = Int(frame.header.number.sample_number)
+        self.currentSample = previousSample + blocksize
+    }
+
+    private func errorCallback() {
+        error = AudioDecodingError(url: source)
+    }
+
+    func nextSampleBuffer() throws -> CMSampleBuffer? {
+        defer {
+            buffer = nil
+            error = nil
+        }
+        let remainingSample = endSample - currentSample
+        guard remainingSample > 0 else {
+            return nil
+        }
+        guard FLAC__stream_decoder_process_single(decoder) != 0 else {
+            throw error ?? AudioDecodingError(url: source)
+        }
+        let gotSample = buffer!.numSamples
+        if gotSample > remainingSample {
+            buffer = try CMSampleBuffer(copying: buffer!, forRange: 0 ..< remainingSample)
+        }
+        return buffer!
+    }
+
+    func seek(to time: CMTime) {
+        var targetSample = Int(time.convertScale(Int32(sampleRate), method: .default).value)
+        targetSample += startSample
+        targetSample = min(targetSample, endSample)
+        seeking = true
+        FLAC__stream_decoder_seek_absolute(decoder, UInt64(targetSample))
+        seeking = false
+        currentSample = targetSample
+    }
 }

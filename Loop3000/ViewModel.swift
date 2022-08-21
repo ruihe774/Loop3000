@@ -251,6 +251,7 @@ class ViewModel: ObservableObject {
     @Published private(set) var playing = false
     @Published private(set) var paused = false
     @Published private(set) var currentTimestamp = Timestamp.zero
+    private var requestedNext = false
 
     @Published var playerSliderValue = 0.0
 
@@ -287,6 +288,7 @@ class ViewModel: ObservableObject {
             .assign(to: &$paused)
 
         player.requestNextHandler = { [unowned self] track in
+            requestedNext = true
             guard let track else {
                 return (self.playingItem?.trackId).map { self.musicLibrary.getTrack(by: $0) }
             }
@@ -312,11 +314,13 @@ class ViewModel: ObservableObject {
             .autoconnect()
             .sink { [unowned self] _ in
                 let playing = player.playing
-                guard self.playing != playing || playing else {
-                    return
+                if self.playing != playing {
+                    self.playing = playing
                 }
-                self.playing = playing
+                guard playing else { return }
                 currentTimestamp = player.currentTimestamp
+                guard requestedNext else { return }
+                requestedNext = false
                 guard let currentTrack = player.currentTrack else {
                     return
                 }
@@ -328,7 +332,9 @@ class ViewModel: ObservableObject {
                 ) else {
                     return
                 }
-                playingItem = currentItem
+                if playingItem != currentItem {
+                    playingItem = currentItem
+                }
             }
         )
 
