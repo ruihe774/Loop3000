@@ -57,7 +57,7 @@ struct Loop3000App: App {
                 ) { result in
                     (try? result.get()).map { model.musicLibrary.performDiscoverMedia(at: $0, recursive: false) }
                 }
-                Button("Discover Music") {
+                Button("Scan Recursively") {
                     model.libraryCommands.showDiscoverer = true
                 }
                 .keyboardShortcut("d", modifiers: [.command, .option])
