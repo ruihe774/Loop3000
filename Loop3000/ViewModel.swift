@@ -2,7 +2,7 @@ import Foundation
 import Combine
 import UniformTypeIdentifiers
 
-extension Album {
+fileprivate extension Album {
     var uiTitle: String {
         metadata[MetadataCommonKey.title] ?? "<No Title>"
     }
@@ -62,7 +62,11 @@ class MusicLibrary: ObservableObject {
         $shelf
             .map { shelf in
                 shelf.albums.map { album in
-                    Playlist(title: album.uiTitle, items: shelf.getTracks(for: album).map { PlaylistItem(trackId: $0.id) })
+                    Playlist(
+                        id: album.id,
+                        title: album.uiTitle,
+                        items: shelf.getTracks(for: album).map { PlaylistItem(trackId: $0.id) }
+                    )
                 }
             }
             .assign(to: &$albumPlaylists)
@@ -301,24 +305,24 @@ class ViewModel: ObservableObject {
         ac.append(Timer.publish(every: 0.25, on: .main, in: .default)
             .autoconnect()
             .sink { [unowned self] _ in
-                let playing = self.player.playing
+                let playing = player.playing
                 guard self.playing != playing || playing else {
                     return
                 }
                 self.playing = playing
-                guard let currentTrack = self.player.currentTrack else {
+                currentTimestamp = player.currentTimestamp
+                guard let currentTrack = player.currentTrack else {
                     return
                 }
-                guard let index = self.playingItem.flatMap({ self.playingList?.items.firstIndex(of: $0) }) else {
+                guard let index = playingItem.flatMap({ playingList?.items.firstIndex(of: $0) }) else {
                     return
                 }
-                guard let currentItem = self.playingList!.items[index...].first(
+                guard let currentItem = playingList!.items[index...].first(
                     where: { $0.trackId == currentTrack.id }
                 ) else {
                     return
                 }
                 playingItem = currentItem
-                self.currentTimestamp = self.player.currentTimestamp
             }
         )
 
@@ -328,6 +332,23 @@ class ViewModel: ObservableObject {
                 return Double(timestamp.value) / Double(track.end.value - track.start.value)
             }
             .assign(to: &$playerSliderValue)
+
+        ac.append(musicLibrary.$playlists
+            .sink { [unowned self] playlists in
+                if let newPlayingList = playlists.first(where: { $0 == self.playingList }) {
+                    self.playingList = newPlayingList
+                } else {
+                    self.playingList = nil
+                    self.playingItem = nil
+                }
+                if let newSelectedList = playlists.first(where: { $0 == self.selectedList }) {
+                    self.selectedList = newSelectedList
+                } else {
+                    self.selectedList = nil
+                    self.selectedItem = nil
+                }
+            }
+        )
     }
 
     func alert(title: String, message: String) {
@@ -351,13 +372,6 @@ class ViewModel: ObservableObject {
     func pause() {
         self.paused = true
         self.player.pause()
-    }
-
-    func stop() {
-        self.player.stop()
-        self.paused = false
-        self.playingList = nil
-        self.playingItem = nil
     }
 
     func resume() {

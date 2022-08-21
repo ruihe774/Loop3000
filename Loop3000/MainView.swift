@@ -20,9 +20,9 @@ struct MainView: View {
                         switch (model.currentView) {
                         case .Discover:
                             DiscoverView()
-                        case .Playlist:
+                        case .Playlist where model.selectedList != nil:
                             PlaylistView(model.selectedList!)
-                        case .Stub:
+                        default:
                             Spacer()
                             Text("Enjoy your music")
                                 .foregroundColor(.secondary)
