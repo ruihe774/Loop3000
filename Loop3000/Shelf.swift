@@ -879,6 +879,7 @@ class PlaybackScheduler {
     private let playbackQueue = DispatchQueue(label: "PlaybackScheduler.playback", qos: .userInteractive)
 
     var requestNextHandler: (Track?) -> Track? = { _ in nil }
+    var errorHandler: (Error) -> () = { fatalError("\($0)") }
 
     private var current: (Track, AudioDecoder)?
     private var next: (Track, AudioDecoder)?
@@ -915,63 +916,68 @@ class PlaybackScheduler {
     }
 
     private func playbackLoop() {
-        while self.renderer.isReadyForMoreMediaData {
-            let currentTime = self.synchronizer.currentTime()
-            var freshStart = false
-            var useCurrent = false
-            if trailingUntil != .invalid {
-                if next == nil {
-                    guard let track = self.requestNextHandler(current?.0) else {
-                        self.renderer.stopRequestingMediaData()
-                        return
-                    }
-                    let decoder = try! makeAudioDecoder(for: track)
-                    next = (track, decoder)
-                }
-                if currentTime >= trailingUntil {
-                    current = next
-                    next = nil
-                    trailingUntil = .invalid
-                    bufferedForCurrentTrack = bufferedForNextTrack
-                    bufferedForNextTrack = .zero
-                    useCurrent = true
-                }
-            } else {
-                if current == nil {
-                    if next != nil {
-                        current = next
-                        next = nil
-                        bufferedForCurrentTrack = bufferedForNextTrack
-                        bufferedForNextTrack = .zero
-                    } else {
-                        guard let track = self.requestNextHandler(nil) else {
+        do {
+            while self.renderer.isReadyForMoreMediaData {
+                let currentTime = self.synchronizer.currentTime()
+                var freshStart = false
+                var useCurrent = false
+                if trailingUntil != .invalid {
+                    if next == nil {
+                        guard let track = self.requestNextHandler(current?.0) else {
                             self.renderer.stopRequestingMediaData()
                             return
                         }
-                        let decoder = try! makeAudioDecoder(for: track)
-                        current = (track, decoder)
-                        freshStart = true
+                        let decoder = try makeAudioDecoder(for: track)
+                        next = (track, decoder)
                     }
-                }
-                useCurrent = true
-            }
-            let decoder = useCurrent ? current!.1 : next!.1
-            bufferedUntil = max(bufferedUntil, currentTime + (freshStart ? CMTime(value: 1, timescale: 3) : CMTime(value: 1, timescale: 100)))
-            if let buffer = try! decoder.nextSampleBuffer() {
-                let duration = CMSampleBufferGetDuration(buffer)
-                CMSampleBufferSetOutputPresentationTimeStamp(buffer, newValue: bufferedUntil)
-                self.renderer.enqueue(buffer)
-                bufferedUntil = bufferedUntil + duration
-                if useCurrent {
-                    bufferedForCurrentTrack = bufferedForCurrentTrack + duration
+                    if currentTime >= trailingUntil {
+                        current = next
+                        next = nil
+                        trailingUntil = .invalid
+                        bufferedForCurrentTrack = bufferedForNextTrack
+                        bufferedForNextTrack = .zero
+                        useCurrent = true
+                    }
                 } else {
-                    bufferedForNextTrack = bufferedForNextTrack + duration
+                    if current == nil {
+                        if next != nil {
+                            current = next
+                            next = nil
+                            bufferedForCurrentTrack = bufferedForNextTrack
+                            bufferedForNextTrack = .zero
+                        } else {
+                            guard let track = self.requestNextHandler(nil) else {
+                                self.renderer.stopRequestingMediaData()
+                                return
+                            }
+                            let decoder = try makeAudioDecoder(for: track)
+                            current = (track, decoder)
+                            freshStart = true
+                        }
+                    }
+                    useCurrent = true
                 }
-            } else if trailingUntil == .invalid {
-                trailingUntil = bufferedUntil
-            } else {
-                Thread.sleep(forTimeInterval: 0.1)
+                let decoder = useCurrent ? current!.1 : next!.1
+                bufferedUntil = max(bufferedUntil, currentTime + (freshStart ? CMTime(value: 1, timescale: 3) : CMTime(value: 1, timescale: 100)))
+                if let buffer = try decoder.nextSampleBuffer() {
+                    let duration = CMSampleBufferGetDuration(buffer)
+                    CMSampleBufferSetOutputPresentationTimeStamp(buffer, newValue: bufferedUntil)
+                    self.renderer.enqueue(buffer)
+                    bufferedUntil = bufferedUntil + duration
+                    if useCurrent {
+                        bufferedForCurrentTrack = bufferedForCurrentTrack + duration
+                    } else {
+                        bufferedForNextTrack = bufferedForNextTrack + duration
+                    }
+                } else if trailingUntil == .invalid {
+                    trailingUntil = bufferedUntil
+                } else {
+                    Thread.sleep(forTimeInterval: 0.1)
+                }
             }
+        } catch let error {
+            self.renderer.stopRequestingMediaData()
+            self.errorHandler(error)
         }
     }
 

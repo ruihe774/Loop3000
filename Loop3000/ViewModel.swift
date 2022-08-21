@@ -302,6 +302,12 @@ class ViewModel: ObservableObject {
             return self.musicLibrary.getTrack(by: self.playingList!.items[prevIndex + 1].trackId)
         }
 
+        player.errorHandler = { [unowned self] error in
+            DispatchQueue.main.async {
+                self.alert(title: "Playback Error", message: error.localizedDescription)
+            }
+        }
+
         ac.append(Timer.publish(every: 0.25, on: .main, in: .default)
             .autoconnect()
             .sink { [unowned self] _ in
