@@ -249,9 +249,6 @@ class ViewModel: ObservableObject {
     @Published private(set) var playing = false
     @Published private(set) var paused = false
     @Published private(set) var currentTimestamp = Timestamp.zero
-    private var requestedNext = false
-
-    @Published var playerSliderValue = 0.0
 
     private var player = PlaybackScheduler()
 
@@ -286,7 +283,6 @@ class ViewModel: ObservableObject {
             .assign(to: &$paused)
 
         player.requestNextHandler = { [unowned self] track in
-            requestedNext = true
             guard let track else {
                 return (self.playingItem?.trackId).map { self.musicLibrary.getTrack(by: $0) }
             }
@@ -317,8 +313,6 @@ class ViewModel: ObservableObject {
                 }
                 guard playing else { return }
                 currentTimestamp = player.currentTimestamp
-                guard requestedNext else { return }
-                requestedNext = false
                 guard let currentTrack = player.currentTrack else {
                     return
                 }
@@ -335,13 +329,6 @@ class ViewModel: ObservableObject {
                 }
             }
         )
-
-        $currentTimestamp
-            .map { [unowned self] timestamp in
-                guard let track = self.playingItem.map({ self.musicLibrary.getTrack(by: $0.trackId) }) else { return 0.0 }
-                return Double(timestamp.value) / Double(track.end.value - track.start.value)
-            }
-            .assign(to: &$playerSliderValue)
 
         ac.append(musicLibrary.$playlists
             .sink { [unowned self] playlists in
@@ -406,5 +393,9 @@ class ViewModel: ObservableObject {
         guard let index = playingList.items.firstIndex(of: playingItem) else { return }
         guard index < playingList.items.count - 1 else { return }
         play(playingList.items[index + 1])
+    }
+
+    func seek(to time: Timestamp) {
+        self.player.seek(to: time)
     }
 }

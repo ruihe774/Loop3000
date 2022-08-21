@@ -77,6 +77,12 @@ extension Timestamp: CustomStringConvertible {
     }
 }
 
+extension Timestamp {
+    var briefDescription: String {
+        String(format: "%02d:%02d", minutes, seconds)
+    }
+}
+
 extension CMTime {
     init(from timestamp: Timestamp) {
         switch timestamp {
@@ -144,6 +150,7 @@ class Album: Unicorn, Codable {
 class Track: Unicorn, Codable {
     private(set) var id = UUID()
     var source: URL
+    private var bookmark: Data?
     var start: Timestamp
     var end: Timestamp
     var albumId: UUID
@@ -188,7 +195,7 @@ class Track: Unicorn, Codable {
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
-        try container.encode(URLBookmarkPair(url: source, bookmark: try? Self.dumpURL(source)), forKey: .source)
+        try container.encode(URLBookmarkPair(url: source, bookmark: (try? Self.dumpURL(source)) ?? bookmark), forKey: .source)
         try container.encode(start, forKey: .start)
         try container.encode(end, forKey: .end)
         try container.encode(albumId, forKey: .albumId)
@@ -200,6 +207,7 @@ class Track: Unicorn, Codable {
         id = try container.decode(UUID.self, forKey: .id)
         let pair = try container.decode(URLBookmarkPair.self, forKey: .source)
         source = pair.bookmark.flatMap({ try? Self.loadURL($0) }) ?? pair.url
+        bookmark = pair.bookmark
         start = try container.decode(Timestamp.self, forKey: .start)
         end = try container.decode(Timestamp.self, forKey: .end)
         albumId = try container.decode(UUID.self, forKey: .albumId)
@@ -1024,6 +1032,17 @@ class PlaybackScheduler {
             self.bufferedUntil = .zero
             self.trailingUntil = .invalid
             self.bufferedForCurrentTrack = .zero
+            self.bufferedForNextTrack = .zero
+        }
+    }
+
+    func seek(to time: Timestamp) {
+        playbackQueue.sync {
+            self.renderer.flush()
+            current!.1.seek(to: CMTime(from: time))
+            self.bufferedUntil = .zero
+            self.trailingUntil = .invalid
+            self.bufferedForCurrentTrack = CMTime(from: time)
             self.bufferedForNextTrack = .zero
         }
     }

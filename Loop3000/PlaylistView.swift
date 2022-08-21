@@ -74,8 +74,7 @@ fileprivate struct PlaylistViewItem: Unicorn {
     var duration: String? {
         let durationValue = track.end.value - track.start.value
         guard durationValue >= 0 else { return nil }
-        let s = Timestamp(value: track.end.value - track.start.value).description
-        return String(s[..<s.index(s.startIndex, offsetBy: 5)])
+        return Timestamp(value: track.end.value - track.start.value).briefDescription
     }
 
     init(track: Track, album: Album, playlistItem: PlaylistItem?, playlist: Playlist?) {

@@ -4,11 +4,11 @@ import Combine
 struct PlayerView: View {
     @EnvironmentObject private var model: ViewModel
 
-    private var ac: [any Cancellable] = []
-
-    private var currentTimestampString: String {
-        let description = model.currentTimestamp.description
-        return String(description[..<description.index(description.startIndex, offsetBy: 5)])
+    @State private var sliderValue = 0.0
+    @State private var duration = Int.max
+    @State private var editing = false
+    private var targetTimestamp: Timestamp {
+        Timestamp(value: Int(Double(duration) * sliderValue))
     }
 
     var body: some View {
@@ -42,10 +42,24 @@ struct PlayerView: View {
             }
             .font(.title2)
             .buttonStyle(.borderless)
-            Text(currentTimestampString)
+            Text(editing ? targetTimestamp.briefDescription : model.currentTimestamp.briefDescription)
                 .padding([.leading, .trailing], 5)
                 .font(.body.monospacedDigit())
-            Slider(value: $model.playerSliderValue, in: 0 ... 1)
+            Slider(value: $sliderValue, in: 0 ... 1, onEditingChanged: { editing = $0 })
+                .onChange(of: model.playingItem) { playingItem in
+                    if let track = playingItem.map({ model.musicLibrary.getTrack(by: $0.trackId) }) {
+                        duration = track.end.value - track.start.value
+                    }
+                }
+                .onChange(of: model.currentTimestamp) { timestamp in
+                    guard !editing else { return }
+                    sliderValue = Double(timestamp.value) / Double(duration)
+                }
+                .onChange(of: editing) { editing in
+                    if !editing {
+                        model.seek(to: targetTimestamp)
+                    }
+                }
                 .disabled(!model.playing && !model.paused)
         }
         .frame(height: 27)
