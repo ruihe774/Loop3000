@@ -48,13 +48,14 @@ struct PlayerView: View {
             Slider(value: $sliderValue, in: 0 ... 1, onEditingChanged: { editing = $0 })
                 .onAppear {
                     updateDuration(model.playingItem)
+                    updateTimestamp(model.currentTimestamp)
                 }
                 .onChange(of: model.playingItem) { playingItem in
                     updateDuration(playingItem)
+                    updateTimestamp(model.currentTimestamp)
                 }
                 .onChange(of: model.currentTimestamp) { timestamp in
-                    guard !editing else { return }
-                    sliderValue = Double(timestamp.value) / Double(duration)
+                    updateTimestamp(timestamp)
                 }
                 .onChange(of: editing) { editing in
                     if !editing {
@@ -73,5 +74,10 @@ struct PlayerView: View {
         if let track = playingItem.map({ model.musicLibrary.getTrack(by: $0.trackId) }) {
             duration = track.end.value - track.start.value
         }
+    }
+
+    func updateTimestamp(_ timestamp: Timestamp) {
+        guard !editing else { return }
+        sliderValue = Double(timestamp.value) / Double(duration)
     }
 }
