@@ -46,10 +46,11 @@ struct PlayerView: View {
                 .padding([.leading, .trailing], 5)
                 .font(.body.monospacedDigit())
             Slider(value: $sliderValue, in: 0 ... 1, onEditingChanged: { editing = $0 })
+                .onAppear {
+                    updateDuration(model.playingItem)
+                }
                 .onChange(of: model.playingItem) { playingItem in
-                    if let track = playingItem.map({ model.musicLibrary.getTrack(by: $0.trackId) }) {
-                        duration = track.end.value - track.start.value
-                    }
+                    updateDuration(playingItem)
                 }
                 .onChange(of: model.currentTimestamp) { timestamp in
                     guard !editing else { return }
@@ -66,5 +67,11 @@ struct PlayerView: View {
         .scenePadding([.leading, .trailing])
         .padding(.top, 32)
         .padding(.bottom, 28)
+    }
+
+    func updateDuration(_ playingItem: PlaylistItem?) {
+        if let track = playingItem.map({ model.musicLibrary.getTrack(by: $0.trackId) }) {
+            duration = track.end.value - track.start.value
+        }
     }
 }
