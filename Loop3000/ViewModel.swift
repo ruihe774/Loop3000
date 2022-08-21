@@ -192,9 +192,7 @@ class MusicLibrary: ObservableObject {
 
     func syncWithStorage() {
         let fileManager = FileManager.default
-        let applicationSupport = try! fileManager.url(
-            for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: false
-        ).appending(component: "Loop3000")
+        let applicationSupport = URL.applicationSupportDirectory.appending(component: "Loop3000")
         try! fileManager.createDirectory(at: applicationSupport, withIntermediateDirectories: true)
         let shelfURL = applicationSupport.appending(component: "shelf.plist")
         if let data = try? readData(from: shelfURL) {

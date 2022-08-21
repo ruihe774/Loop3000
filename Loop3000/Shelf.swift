@@ -97,13 +97,13 @@ extension CMTime {
 extension Timestamp: Codable {
     func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
-        try container.encode(description)
+        try container.encode(value)
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
-        let s = try container.decode(String.self)
-        self.init(fromCueTimestampString: s)!
+        let s = try container.decode(Int.self)
+        self.init(valueUnchecked: s)
     }
 }
 
@@ -154,6 +154,56 @@ class Track: Unicorn, Codable {
         self.start = start
         self.end = end
         self.albumId = albumId
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case source
+        case start
+        case end
+        case albumId
+        case metadata
+    }
+
+    private struct BookmarkDataDecodingError: Error {}
+
+    private struct URLBookmarkPair: Codable {
+        let url: URL
+        let bookmark: Data?
+    }
+
+    private static func dumpURL(_ url: URL) throws -> Data {
+        return try url.bookmarkData(options: [.withSecurityScope, .securityScopeAllowOnlyReadAccess])
+    }
+
+    private static func loadURL(_ data: Data) throws -> URL {
+        var isStale = false
+        let url = try URL(resolvingBookmarkData: data, options: .withSecurityScope, bookmarkDataIsStale: &isStale)
+        guard !isStale && url.startAccessingSecurityScopedResource() else {
+            throw BookmarkDataDecodingError()
+        }
+        return url
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(URLBookmarkPair(url: source, bookmark: try? Self.dumpURL(source)), forKey: .source)
+        try container.encode(start, forKey: .start)
+        try container.encode(end, forKey: .end)
+        try container.encode(albumId, forKey: .albumId)
+        try container.encode(metadata, forKey: .metadata)
+    }
+
+    required init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        let pair = try container.decode(URLBookmarkPair.self, forKey: .source)
+        source = pair.bookmark.flatMap({ try? Self.loadURL($0) }) ?? pair.url
+        start = try container.decode(Timestamp.self, forKey: .start)
+        end = try container.decode(Timestamp.self, forKey: .end)
+        albumId = try container.decode(UUID.self, forKey: .albumId)
+        metadata = try container.decode(Metadata.self, forKey: .metadata)
     }
 }
 
