@@ -1040,6 +1040,7 @@ class PlaybackScheduler {
         playbackQueue.sync {
             self.renderer.flush()
             current!.1.seek(to: CMTime(from: time))
+            next?.1.seek(to: .zero)
             self.bufferedUntil = .zero
             self.trailingUntil = .invalid
             self.bufferedForCurrentTrack = CMTime(from: time)
