@@ -30,7 +30,7 @@
 		66684C7528A7C28800C32BC8 /* ViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewModel.swift; sourceTree = "<group>"; };
 		66684C7728A7FC6700C32BC8 /* DiscoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverView.swift; sourceTree = "<group>"; };
 		66684C7B28A823A500C32BC8 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
-		666BD94928B04269006E0408 /* Loop3000-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Loop3000-Bridging-Header.h"; sourceTree = "<group>"; };
+		666BD94928B04269006E0408 /* Bridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Bridge.h; sourceTree = "<group>"; };
 		666BD94D28B04303006E0408 /* libogg.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libogg.a; sourceTree = "<group>"; };
 		666BD94E28B04303006E0408 /* libFLAC.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libFLAC.a; sourceTree = "<group>"; };
 		66732F6E28A63F400089682A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -97,7 +97,7 @@
 				6604F69E28A90F4400B84549 /* PlaylistView.swift */,
 				6604F6A028A92BF900B84549 /* PlayerView.swift */,
 				662C8ABF28AF8C5C003983FE /* Util.swift */,
-				666BD94928B04269006E0408 /* Loop3000-Bridging-Header.h */,
+				666BD94928B04269006E0408 /* Bridge.h */,
 			);
 			path = Loop3000;
 			sourceTree = "<group>";
@@ -333,7 +333,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = io.misakikasumi.Loop3000;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "Loop3000/Loop3000-Bridging-Header.h";
+				SWIFT_OBJC_BRIDGING_HEADER = Loop3000/Bridge.h;
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
@@ -363,7 +363,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = io.misakikasumi.Loop3000;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "Loop3000/Loop3000-Bridging-Header.h";
+				SWIFT_OBJC_BRIDGING_HEADER = Loop3000/Bridge.h;
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
