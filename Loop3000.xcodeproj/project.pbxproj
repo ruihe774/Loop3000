@@ -311,7 +311,7 @@
 				CODE_SIGN_ENTITLEMENTS = Loop3000/Loop3000.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 55;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Loop3000/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
@@ -341,7 +341,7 @@
 				CODE_SIGN_ENTITLEMENTS = Loop3000/Loop3000.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 55;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Loop3000/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
