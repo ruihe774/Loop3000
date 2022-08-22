@@ -611,6 +611,35 @@ fileprivate class CueSheetImporter: MediaImporter {
 
     private static let linePartRegex = /(".+?"|.+?)\s+/
 
+    private func fuzzyMatch(url: URL) throws -> URL? {
+        let fileManager = FileManager.default
+        let peers = try fileManager.contentsOfDirectory(at: url.deletingLastPathComponent(), includingPropertiesForKeys: [])
+        var candidates: [URL] = []
+        for grabber in metadataGrabbers {
+            candidates.append(contentsOf: peers.filter { url in
+                guard let type = UTType(filenameExtension: url.pathExtension) else { return false }
+                return grabber.supportedTypes.contains { type.conforms(to: $0) }
+            })
+        }
+        return candidates
+            .compactMap { candidate in
+                let expectedStem = url.deletingPathExtension().lastPathComponent
+                let candidateStem = candidate.deletingPathExtension().lastPathComponent
+                let expectedWords = expectedStem.split { !$0.isLetter }
+                let candidateWords = candidateStem.split { !$0.isLetter }
+                if expectedWords.filter({ candidateWords.contains($0) }) == candidateWords {
+                    return (candidate, expectedWords.count - candidateWords.count)
+                }
+                if candidateWords.filter({ expectedWords.contains($0) }) == expectedWords {
+                    return (candidate, candidateWords.count - expectedWords.count)
+                }
+                return nil
+            }
+            .sorted { $0.1 < $1.1 }
+            .first
+            .map { $0.0 }
+    }
+
     func importMedia(url: URL, tracer: RequestTracer?) async throws -> (albums: [Album], tracks: [Track]) {
         let content = try readString(from: url)
         var currentFile: URL?
@@ -644,12 +673,10 @@ fileprivate class CueSheetImporter: MediaImporter {
             case ("FILE", 2):
                 var file = URL(filePath: params[0], relativeTo: url.deletingLastPathComponent())
                 if file.isFileURL && !FileManager.default.fileExists(atPath: file.path) {
-                    // When compressing using FLAC, EAC retain .wav suffix in cue
-                    let flacFile = file.replacingPathExtension("flac")
-                    guard FileManager.default.fileExists(atPath: flacFile.path) else {
+                    guard let matchedFile = try fuzzyMatch(url: file) else {
                         throw FileNotFound(url: file)
                     }
-                    file = flacFile
+                    file = matchedFile
                 }
                 currentFile = file
             case ("TRACK", 2):
