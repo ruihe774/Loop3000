@@ -61,9 +61,9 @@ struct Sidebar: View {
                     ForEach(
                         listType == .Albums ? model.musicLibrary.albumPlaylists : model.musicLibrary.manualPlaylists
                     ) { playlist in
-                        let selected = model.selectedList == playlist
+                        let selected = model.selectedList == playlist.id
                         Button {
-                            model.selectedList = playlist
+                            model.selectedList = playlist.id
                         } label: {
                             HStack {
                                 Text(playlist.title)
@@ -88,7 +88,7 @@ struct Sidebar: View {
         .background(SidebarMaterial())
         .onAppear {
             guard let selectedList = model.selectedList else { return }
-            listType = model.musicLibrary.albumPlaylists.contains(selectedList) ? .Albums : .Playlists
+            listType = model.musicLibrary.albumPlaylists.contains(where: { $0.id == selectedList }) ? .Albums : .Playlists
         }
     }
 }

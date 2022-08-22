@@ -94,15 +94,15 @@ fileprivate struct PlaylistItemView: View {
     private var viewItem: PlaylistViewItem
 
     private var selected: Bool {
-        viewItem.playlistItem != nil && model.selectedItem == viewItem.playlistItem
+        viewItem.playlistItem != nil && model.selectedItem == viewItem.playlistItem?.id
     }
 
     private var currentPlaying: Bool {
-        viewItem.playlistItem != nil && model.playing && model.playingItem == viewItem.playlistItem
+        viewItem.playlistItem != nil && model.playing && model.playingItem == viewItem.playlistItem?.id
     }
 
     private var currentPausd: Bool {
-        viewItem.playlistItem != nil && model.paused && model.playingItem == viewItem.playlistItem
+        viewItem.playlistItem != nil && model.paused && model.playingItem == viewItem.playlistItem?.id
     }
 
     init(_ viewItem: PlaylistViewItem) {
@@ -139,9 +139,9 @@ fileprivate struct PlaylistItemView: View {
             guard let playlistItem = viewItem.playlistItem else { return }
             let now = DispatchTime.now()
             if now.uptimeNanoseconds - lastTap.uptimeNanoseconds < 300000000 {
-                model.play(playlistItem)
+                model.play(playlistItem.id)
             } else {
-                model.selectedItem = playlistItem
+                model.selectedItem = playlistItem.id
             }
             lastTap = now
         }

@@ -216,10 +216,11 @@ class Track: Unicorn, Codable {
 }
 
 class PlaylistItem: Unicorn, Codable {
-    private(set) var id = UUID()
+    private(set) var id: UUID
     var trackId: UUID
 
-    init(trackId: UUID) {
+    init(id: UUID = UUID(), trackId: UUID) {
+        self.id = id
         self.trackId = trackId
     }
 }

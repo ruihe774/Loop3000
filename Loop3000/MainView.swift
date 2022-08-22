@@ -1,5 +1,14 @@
 import SwiftUI
 
+struct Stub: View {
+    var body: some View {
+        Spacer()
+        Text("Enjoy your music")
+            .foregroundColor(.secondary)
+        Spacer()
+    }
+}
+
 struct MainView: View {
     @EnvironmentObject private var model: ViewModel
 
@@ -20,13 +29,15 @@ struct MainView: View {
                         switch (model.currentView) {
                         case .Discover:
                             DiscoverView()
-                        case .Playlist where model.selectedList != nil:
-                            PlaylistView(model.selectedList!)
+                        case .Playlist:
+                            let list = model.selectedList.flatMap({ model.musicLibrary.getPlaylist(by: $0) })
+                            if list != nil {
+                                PlaylistView(list!)
+                            } else {
+                                Stub()
+                            }
                         default:
-                            Spacer()
-                            Text("Enjoy your music")
-                                .foregroundColor(.secondary)
-                            Spacer()
+                            Stub()
                         }
                     }
                 }

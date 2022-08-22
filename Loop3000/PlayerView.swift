@@ -70,8 +70,10 @@ struct PlayerView: View {
         .padding(.bottom, 28)
     }
 
-    func updateDuration(_ playingItem: PlaylistItem?) {
-        if let track = playingItem.map({ model.musicLibrary.getTrack(by: $0.trackId) }) {
+    func updateDuration(_ itemId: UUID?) {
+        if let track = itemId
+            .flatMap({ model.musicLibrary.locatePlaylistItem(by: $0)?.1 })
+            .map({ model.musicLibrary.getTrack(by: $0.trackId) }) {
             duration = track.end.value - track.start.value
         }
     }

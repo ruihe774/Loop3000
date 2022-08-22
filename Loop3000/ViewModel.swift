@@ -2,12 +2,6 @@ import Foundation
 import Combine
 import UniformTypeIdentifiers
 
-fileprivate extension Album {
-    var uiTitle: String {
-        metadata[MetadataCommonKey.title] ?? "<No Title>"
-    }
-}
-
 fileprivate struct ObservableRequestTracer: RequestTracer {
     func add(_ url: URL) {
         adding.send(url)
@@ -64,8 +58,8 @@ class MusicLibrary: ObservableObject {
                 shelf.albums.map { album in
                     Playlist(
                         id: album.id,
-                        title: album.uiTitle,
-                        items: shelf.getTracks(for: album).map { PlaylistItem(trackId: $0.id) }
+                        title: album.metadata[MetadataCommonKey.title] ?? "<No Title>",
+                        items: shelf.getTracks(for: album).map { PlaylistItem(id: $0.id, trackId: $0.id) }
                     )
                 }
             }
@@ -174,12 +168,17 @@ class MusicLibrary: ObservableObject {
         tracks.get(by: id)!
     }
 
-    func getPlaylist(by id: UUID) -> Playlist {
-        playlists.get(by: id)!
+    func getPlaylist(by id: UUID) -> Playlist? {
+        playlists.get(by: id)
     }
 
-    func getPlaylist(for item: PlaylistItem) -> Playlist {
-        playlists.first { $0.items.contains(item) }!
+    func locatePlaylistItem(by id: UUID) -> (Playlist, PlaylistItem)? {
+        for list in playlists {
+            if let item = list.items.first(where: { $0.id == id }) {
+                return (list, item)
+            }
+        }
+        return nil
     }
 
     func sorted(albums: [Album]) -> [Album] {
@@ -242,10 +241,9 @@ class ViewModel: ObservableObject {
     @Published private(set) var currentView = ShowView.Stub
     @Published private(set) var previousView: ShowView?
 
-    @Published var selectedList: Playlist?
-    @Published private(set) var playingList: Playlist?
-    @Published var selectedItem: PlaylistItem?
-    @Published private(set) var playingItem: PlaylistItem?
+    @Published var selectedList: UUID?
+    @Published var selectedItem: UUID?
+    @Published private(set) var playingItem: UUID?
     @Published private(set) var playing = false
     @Published private(set) var paused = false
     @Published private(set) var currentTimestamp = Timestamp.zero
@@ -271,8 +269,7 @@ class ViewModel: ObservableObject {
             .assign(to: &$currentView)
 
         $selectedList
-            .withPrevious()
-            .compactMap { $0.1 != nil && $0.0??.id != $0.1!.id ? .Playlist : nil }
+            .compactMap { $0.map { _ in .Playlist } }
             .assign(to: &$currentView)
 
         $playingItem
@@ -284,19 +281,20 @@ class ViewModel: ObservableObject {
             .assign(to: &$paused)
 
         player.requestNextHandler = { [unowned self] track in
+            guard let (list, item) = playingItem.flatMap({ musicLibrary.locatePlaylistItem(by: $0) }) else {
+                return nil
+            }
             guard let track else {
-                return (self.playingItem?.trackId).map { self.musicLibrary.getTrack(by: $0) }
+                return musicLibrary.getTrack(by: item.trackId)
             }
-            guard let index = self.playingItem.flatMap({ self.playingList?.items.firstIndex(of: $0) }) else {
+            let index = list.items.firstIndex(of: item)!
+            guard let prevIndex = list.items[index...].firstIndex(where: { $0.trackId == track.id }) else {
                 return nil
             }
-            guard let prevIndex = self.playingList!.items[index...].firstIndex(where: { $0.trackId == track.id }) else {
+            guard prevIndex < list.items.count - 1 else {
                 return nil
             }
-            guard prevIndex < self.playingList!.items.count - 1 else {
-                return nil
-            }
-            return self.musicLibrary.getTrack(by: self.playingList!.items[prevIndex + 1].trackId)
+            return self.musicLibrary.getTrack(by: list.items[prevIndex + 1].trackId)
         }
 
         player.errorHandler = { [unowned self] error in
@@ -317,33 +315,15 @@ class ViewModel: ObservableObject {
                 guard let currentTrack = player.currentTrack else {
                     return
                 }
-                guard let index = playingItem.flatMap({ playingList?.items.firstIndex(of: $0) }) else {
+                guard let (list, item) = playingItem.flatMap({ musicLibrary.locatePlaylistItem(by: $0) }) else {
                     return
                 }
-                guard let currentItem = playingList!.items[index...].first(
-                    where: { $0.trackId == currentTrack.id }
-                ) else {
+                let index = list.items.firstIndex(of: item)!
+                guard let currentItem = list.items[index...].first(where: { $0.trackId == currentTrack.id })?.id else {
                     return
                 }
                 if playingItem != currentItem {
                     playingItem = currentItem
-                }
-            }
-        )
-
-        ac.append(musicLibrary.$playlists
-            .sink { [unowned self] playlists in
-                if let newPlayingList = playlists.first(where: { $0 == self.playingList }) {
-                    self.playingList = newPlayingList
-                } else {
-                    self.playingList = nil
-                    self.playingItem = nil
-                }
-                if let newSelectedList = playlists.first(where: { $0 == self.selectedList }) {
-                    self.selectedList = newSelectedList
-                } else {
-                    self.selectedList = nil
-                    self.selectedItem = nil
                 }
             }
         )
@@ -360,9 +340,8 @@ class ViewModel: ObservableObject {
         currentView = previousView
     }
 
-    func play(_ item: PlaylistItem) {
-        self.playingList = self.musicLibrary.getPlaylist(for: item)
-        self.playingItem = item
+    func play(_ itemId: UUID) {
+        self.playingItem = itemId
         self.player.stop()
         self.player.play()
     }
@@ -376,24 +355,29 @@ class ViewModel: ObservableObject {
         if playingItem != nil {
             self.player.play()
         } else {
-            (playingList ?? selectedList)
+            selectedList
+                .flatMap { musicLibrary.getPlaylist(by: $0) }
                 .flatMap { $0.items.first }
-                .map { self.play($0) }
+                .map { self.play($0.id) }
         }
     }
 
     func playPrevious() {
-        guard let playingItem, let playingList else { return }
-        guard let index = playingList.items.firstIndex(of: playingItem) else { return }
+        guard let (list, item) = playingItem.flatMap({ musicLibrary.locatePlaylistItem(by: $0) }) else {
+            return
+        }
+        let index = list.items.firstIndex(of: item)!
         guard index > 0 else { return }
-        play(playingList.items[index - 1])
+        play(list.items[index - 1].id)
     }
 
     func playNext() {
-        guard let playingItem, let playingList else { return }
-        guard let index = playingList.items.firstIndex(of: playingItem) else { return }
-        guard index < playingList.items.count - 1 else { return }
-        play(playingList.items[index + 1])
+        guard let (list, item) = playingItem.flatMap({ musicLibrary.locatePlaylistItem(by: $0) }) else {
+            return
+        }
+        let index = list.items.firstIndex(of: item)!
+        guard index < list.items.count - 1 else { return }
+        play(list.items[index + 1].id)
     }
 
     func seek(to time: Timestamp) {
