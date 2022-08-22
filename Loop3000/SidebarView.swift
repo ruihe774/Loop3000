@@ -37,6 +37,7 @@ struct Sidebar: View {
                 .textFieldStyle(.plain)
                 .background(RoundedRectangle(cornerRadius: 8).fill(Color(nsColor: .quaternaryLabelColor).opacity(0.5)))
                 .padding(.bottom, 10)
+                .disabled(true)
             HStack(spacing: 15) {
                 Button {
                     listType = .Albums
@@ -54,6 +55,7 @@ struct Sidebar: View {
                 }
                 .foregroundColor(listType == .Playlists ? .accentColor : .secondary)
                 .buttonStyle(.borderless)
+                .disabled(true)
             }
             .font(.title2)
             ScrollView {
