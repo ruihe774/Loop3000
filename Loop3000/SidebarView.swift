@@ -74,9 +74,10 @@ struct Sidebar: View {
                                     .scaledToFit()
                                 Spacer()
                             }
+                            .padding(6)
                         }
                         .buttonStyle(.borderless)
-                        .padding(8)
+                        .padding(2)
                         .background(selected ? Color(nsColor: .quaternaryLabelColor) : .clear)
                         .cornerRadius(8)
                     }
