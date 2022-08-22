@@ -1165,7 +1165,6 @@ class FLACDecoder: AudioDecoder {
     }
 
     private func writeCallback(frame: FLAC__Frame, buffer: UnsafePointer<UnsafePointer<Int32>?>) throws {
-        precondition(frame.header.channels == 2)
         let asbd = AudioStreamBasicDescription(
             mSampleRate: Float64(frame.header.sample_rate),
             mFormatID: kAudioFormatLinearPCM,
@@ -1177,7 +1176,28 @@ class FLACDecoder: AudioDecoder {
             mBitsPerChannel: frame.header.bits_per_sample,
             mReserved: 0
         )
-        let description = try CMAudioFormatDescription(audioStreamBasicDescription: asbd)
+        var channelLayout: ManagedAudioChannelLayout?
+        switch frame.header.channels {
+        case 1:
+            channelLayout = ManagedAudioChannelLayout(tag: kAudioChannelLayoutTag_Mono)
+        case 2:
+            channelLayout = ManagedAudioChannelLayout(tag: kAudioChannelLayoutTag_Stereo)
+        case 3:
+            channelLayout = ManagedAudioChannelLayout(tag: kAudioChannelLayoutTag_WAVE_3_0)
+        case 4:
+            channelLayout = ManagedAudioChannelLayout(tag: kAudioChannelLayoutTag_WAVE_4_0_B)
+        case 5:
+            channelLayout = ManagedAudioChannelLayout(tag: kAudioChannelLayoutTag_WAVE_5_0_A)
+        case 6:
+            channelLayout = ManagedAudioChannelLayout(tag: kAudioChannelLayoutTag_WAVE_5_1_A)
+        case 7:
+            channelLayout = ManagedAudioChannelLayout(tag: kAudioChannelLayoutTag_WAVE_6_1)
+        case 8:
+            channelLayout = ManagedAudioChannelLayout(tag: kAudioChannelLayoutTag_WAVE_7_1)
+        default:
+            fatalError("Unsupported channel layout.")
+        }
+        let description = try CMAudioFormatDescription(audioStreamBasicDescription: asbd, layout: channelLayout!)
         let blocksize = Int(frame.header.blocksize)
         let channels = Int(frame.header.channels)
         let totalLength = blocksize * 4 * channels
