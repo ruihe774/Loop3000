@@ -162,9 +162,11 @@ func makeMonotonicUUID() -> UUID {
     return uuid as UUID
 }
 
+fileprivate let universalSeparators = CharacterSet(charactersIn: ",;，；、\r\n")
+
 func universalSplit(_ s: String) -> [String] {
     s
-        .split { ",;，；、\r\n".contains($0) }
+        .components(separatedBy: universalSeparators)
         .map { $0.trimmingCharacters(in: .whitespaces) }
         .filter { !$0.isEmpty }
 }
