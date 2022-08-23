@@ -81,7 +81,7 @@ extension Timestamp: CustomStringConvertible {
 
 extension Timestamp {
     var briefDescription: String {
-        String(format: "%02d:%02d", minutes, seconds)
+        String(format: "%02d:%02d", minutes, seconds + (frames > Self.timescale / 2 ? 1 : 0))
     }
 }
 

@@ -161,3 +161,10 @@ func makeMonotonicUUID() -> UUID {
     }
     return uuid as UUID
 }
+
+func universalSplit(_ s: String) -> [String] {
+    s
+        .split { ",;，；、\r\n".contains($0) }
+        .map { $0.trimmingCharacters(in: .whitespaces) }
+        .filter { !$0.isEmpty }
+}

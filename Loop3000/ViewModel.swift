@@ -1,5 +1,8 @@
 import Foundation
+import AppKit
+import CoreGraphics
 import Combine
+import MediaPlayer
 import UniformTypeIdentifiers
 
 fileprivate struct ObservableRequestTracer: RequestTracer {
@@ -258,6 +261,12 @@ class ViewModel: ObservableObject {
 
     private var player = PlaybackScheduler()
 
+    private var nowPlayingCenter: MPNowPlayingInfoCenter { MPNowPlayingInfoCenter.default() }
+    private var remoteControlCenter: MPRemoteCommandCenter { MPRemoteCommandCenter.shared() }
+    private var remoteControlInitialized = false
+    private var coverJPEG: Data?
+    private var coverImage: CGImage?
+
     private var ac: [any Cancellable] = []
 
     init() {
@@ -281,7 +290,12 @@ class ViewModel: ObservableObject {
             .assign(to: &$currentView)
 
         $playingItem
-            .compactMap { $0 }
+            .compactMap { [unowned self] playingItem in
+                guard let playingItem else { return nil }
+                guard let (list, _) = self.musicLibrary.locatePlaylistItem(by: playingItem) else { return nil }
+                guard list.id == self.selectedList else { return nil }
+                return playingItem
+            }
             .assign(to: &$selectedItem)
 
         $playing
@@ -311,15 +325,23 @@ class ViewModel: ObservableObject {
             }
         }
 
+        var tick = 0
         ac.append(Timer.publish(every: 0.25, on: .main, in: .default)
             .autoconnect()
             .sink { [unowned self] _ in
                 let playing = player.playing
                 if self.playing != playing {
                     self.playing = playing
+                    if !playing && player.currentTrack == nil {
+                        playingItem = nil
+                    }
                 }
                 guard playing else { return }
                 currentTimestamp = player.currentTimestamp
+                tick += 1
+                if tick % 20 == 0 {
+                    updateNowPlayingElapsedPlaybackTime()
+                }
                 guard let currentTrack = player.currentTrack else {
                     return
                 }
@@ -335,6 +357,64 @@ class ViewModel: ObservableObject {
                 }
             }
         )
+
+        ac.append(Publishers.CombineLatest($playing, $paused)
+            .sink { [unowned self] (playing, paused) in
+                if playing {
+                    nowPlayingCenter.playbackState = .playing
+                    updateNowPlayingElapsedPlaybackTime()
+                } else if paused {
+                    nowPlayingCenter.playbackState = .paused
+                    updateNowPlayingElapsedPlaybackTime()
+                } else {
+                    nowPlayingCenter.playbackState = .stopped
+                }
+                initRemoteControl()
+            }
+        )
+
+        ac.append($playingItem.sink { [unowned self] playingItem in
+            if let playingItem {
+                guard let (_, item) = musicLibrary.locatePlaylistItem(by: playingItem) else { return }
+                let track = musicLibrary.getTrack(by: item.trackId)
+                let album = musicLibrary.getAlbum(for: track)
+                if album.coverJPEG != coverJPEG {
+                    coverJPEG = album.coverJPEG
+                    coverImage = coverJPEG.map { coverJPEG in
+                        return CGImage(
+                            jpegDataProviderSource: CGDataProvider(data: coverJPEG as CFData)!,
+                            decode: nil,
+                            shouldInterpolate: true,
+                            intent: .defaultIntent
+                        )!
+                    }
+                }
+                nowPlayingCenter.nowPlayingInfo = [
+                    MPMediaItemPropertyPlaybackDuration: Double(track.end.value - track.start.value) / Double(Timestamp.timescale),
+                    MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.audio.rawValue,
+                    MPNowPlayingInfoPropertyAssetURL: track.source,
+                    MPNowPlayingInfoPropertyElapsedPlaybackTime: 0.0,
+                    MPNowPlayingInfoPropertyPlaybackRate: 1.0,
+                    MPNowPlayingInfoPropertyDefaultPlaybackRate: 1.0,
+                    MPNowPlayingInfoPropertyIsLiveStream: false,
+                    MPMediaItemPropertyTitle: track.metadata[MetadataCommonKey.title] ?? track.source.lastPathComponent,
+                    MPMediaItemPropertyArtist:
+                        (track.metadata[MetadataCommonKey.artist] ?? album.metadata[MetadataCommonKey.artist])
+                            .map({ universalSplit($0).joined(separator: "; ") }) as Any,
+                    MPMediaItemPropertyAlbumTitle: album.metadata[MetadataCommonKey.title] as Any,
+                    MPMediaItemPropertyArtwork: coverImage.map({ coverImage in
+                        MPMediaItemArtwork(
+                            boundsSize: CGSize(width: Double(coverImage.width), height: Double(coverImage.height))
+                        ) { size in
+                            NSImage(cgImage: coverImage, size: size)
+                        }
+                    }) as Any
+                ]
+            } else {
+                nowPlayingCenter.nowPlayingInfo = nil
+            }
+        })
+
     }
 
     func alert(title: String, message: String) {
@@ -390,5 +470,38 @@ class ViewModel: ObservableObject {
 
     func seek(to time: Timestamp) {
         self.player.seek(to: time)
+        currentTimestamp = self.player.currentTimestamp
+        updateNowPlayingElapsedPlaybackTime()
+    }
+
+    func initRemoteControl() {
+        guard !remoteControlInitialized else { return }
+        remoteControlCenter.playCommand.addTarget { _ in
+            self.resume()
+            return .success
+        }
+        remoteControlCenter.pauseCommand.addTarget { _ in
+            self.pause()
+            return .success
+        }
+        remoteControlCenter.previousTrackCommand.addTarget { _ in
+            self.playPrevious()
+            return .success
+        }
+        remoteControlCenter.nextTrackCommand.addTarget { _ in
+            self.playNext()
+            return .success
+        }
+        remoteControlCenter.changePlaybackPositionCommand.addTarget { event in
+            let seekEvent = event as! MPChangePlaybackPositionCommandEvent
+            self.seek(to: Timestamp(value: Int(seekEvent.positionTime * Double(Timestamp.timescale))))
+            return .success
+        }
+        remoteControlInitialized = true
+    }
+
+    func updateNowPlayingElapsedPlaybackTime() {
+        nowPlayingCenter.nowPlayingInfo?[MPNowPlayingInfoPropertyElapsedPlaybackTime] =
+            Double(currentTimestamp.value) / Double(Timestamp.timescale)
     }
 }

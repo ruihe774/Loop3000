@@ -72,8 +72,11 @@ class PlaybackScheduler {
     }
 
     var currentTimestamp: Timestamp {
-        let time = (trailingUntil != .invalid && synchronizer.currentTime() >= trailingUntil
-                    ? bufferedForNextTrack : bufferedForCurrentTrack) + (self.synchronizer.currentTime() - bufferedUntil)
+        var time = (trailingUntil != .invalid && synchronizer.currentTime() >= trailingUntil
+                    ? bufferedForNextTrack : bufferedForCurrentTrack)
+        if bufferedUntil != .zero {
+            time = time + (self.synchronizer.currentTime() - bufferedUntil)
+        }
         return Timestamp(from: max(time, .zero))
     }
 

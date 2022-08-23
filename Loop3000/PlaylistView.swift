@@ -8,13 +8,6 @@ fileprivate struct PlaylistViewItem: Unicorn {
     let playlistItem: PlaylistItem?
     let playlist: Playlist?
 
-    private func universalSplit(_ s: String) -> [String] {
-        s
-            .split { ",;，；、\r\n".contains($0) }
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-    }
-
     var title: String? {
         track.metadata[MetadataCommonKey.title]
     }
@@ -256,11 +249,26 @@ struct MetadataItemView: View {
     private let label: String
     private let text: String
     private let scrollable: Bool
+    private let selectable: Bool
 
-    fileprivate init(label: String, text: String, scrollable: Bool = false) {
+    private var textView: some View {
+        ZStack {
+            if selectable {
+                Text(text)
+                    .textSelection(.enabled)
+                    .multilineTextAlignment(.trailing)
+            } else {
+                Text(text)
+                    .multilineTextAlignment(.trailing)
+            }
+        }
+    }
+
+    fileprivate init(label: String, text: String, scrollable: Bool = false, selectable: Bool = true) {
         self.label = label
         self.text = text
         self.scrollable = scrollable
+        self.selectable = selectable
     }
 
     var body: some View {
@@ -270,14 +278,11 @@ struct MetadataItemView: View {
             Spacer(minLength: 15)
             if scrollable {
                 ScrollView(.horizontal) {
-                    Text(text)
-                        .textSelection(.enabled)
+                    textView
                 }
                 .scrollIndicators(.never)
             } else {
-                Text(text)
-                    .textSelection(.enabled)
-                    .multilineTextAlignment(.trailing)
+                textView
             }
         }
         .font(.caption.weight(.medium))
@@ -346,8 +351,14 @@ struct MetadataView: View {
                     MetadataItemView(
                         label: isFile ? "File" : "URL",
                         text: isFile ? viewItem.track.source.path : viewItem.track.source.description,
-                        scrollable: true
+                        scrollable: true,
+                        selectable: !isFile
                     )
+                    .onTapGesture {
+                        if isFile {
+                            NSWorkspace.shared.activateFileViewerSelecting([viewItem.track.source])
+                        }
+                    }
                 }
                 .padding()
                 Spacer()
