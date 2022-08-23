@@ -629,11 +629,12 @@ fileprivate class CueSheetImporter: MediaImporter {
             })
         }
         return candidates
-            .compactMap { candidate in
+            .compactMap { candidate -> (URL, Int)? in
                 let expectedStem = url.deletingPathExtension().lastPathComponent
                 let candidateStem = candidate.deletingPathExtension().lastPathComponent
                 let expectedWords = expectedStem.split { !$0.isLetter }
                 let candidateWords = candidateStem.split { !$0.isLetter }
+                guard !expectedWords.isEmpty && !candidateWords.isEmpty else { return nil }
                 if expectedWords.filter({ candidateWords.contains($0) }) == candidateWords {
                     return (candidate, expectedWords.count - candidateWords.count)
                 }
