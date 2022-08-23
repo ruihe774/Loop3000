@@ -147,7 +147,7 @@ struct MetadataCommonKey {
 class Album: Unicorn, Codable {
     private(set) var id = makeMonotonicUUID()
     var metadata = Metadata()
-    var coverJPEG: Data?
+    var cover: Data?
 }
 
 class Track: Unicorn, Codable {
@@ -907,6 +907,12 @@ var artworkLoaders: [any ArtworkLoader] = [CGArtworkLoader()]
 
 fileprivate let scaler = Scaler()
 
+func loadImage(from data: Data) -> CGImage {
+    let source = CGImageSourceCreateWithData(data as CFData, nil)!
+    let image = CGImageSourceCreateImageAtIndex(source, 0, nil)!
+    return image
+}
+
 extension Shelf {
     private func loadOriginalArtwork(for album: Album, tracer: RequestTracer? = nil) async throws -> CGImage? {
         let tracks = getTracks(for: album)
@@ -937,7 +943,7 @@ extension Shelf {
     func loadAllArtworks(tracer: RequestTracer? = nil) async -> [Error] {
         let (images, errors) = await withTaskGroup(of: (Album, CGImage?, Error?).self) { taskGroup in
             for album in albums {
-                if album.coverJPEG == nil {
+                if album.cover == nil {
                     taskGroup.addTask {
                         do {
                             return (album, try await loadOriginalArtwork(for: album, tracer: tracer), nil)
@@ -967,8 +973,9 @@ extension Shelf {
                 taskGroup.addTask {
                     await withCheckedContinuation { continuation in
                         DispatchQueue.global().async {
-                            album.coverJPEG = cictx.jpegRepresentation(
+                            album.cover = cictx.heifRepresentation(
                                 of: image,
+                                format: .BGRA8,     // I did not figure out what this argument means.
                                 colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
                                 options: [.init(rawValue: kCGImageDestinationLossyCompressionQuality as String): 0.75]
                             )!

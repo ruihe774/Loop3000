@@ -264,7 +264,7 @@ class ViewModel: ObservableObject {
     private var nowPlayingCenter: MPNowPlayingInfoCenter { MPNowPlayingInfoCenter.default() }
     private var remoteControlCenter: MPRemoteCommandCenter { MPRemoteCommandCenter.shared() }
     private var remoteControlInitialized = false
-    private var coverJPEG: Data?
+    private var coverData: Data?
     private var coverImage: CGImage?
 
     private var ac: [any Cancellable] = []
@@ -378,16 +378,9 @@ class ViewModel: ObservableObject {
                 guard let (_, item) = musicLibrary.locatePlaylistItem(by: playingItem) else { return }
                 let track = musicLibrary.getTrack(by: item.trackId)
                 let album = musicLibrary.getAlbum(for: track)
-                if album.coverJPEG != coverJPEG {
-                    coverJPEG = album.coverJPEG
-                    coverImage = coverJPEG.map { coverJPEG in
-                        return CGImage(
-                            jpegDataProviderSource: CGDataProvider(data: coverJPEG as CFData)!,
-                            decode: nil,
-                            shouldInterpolate: true,
-                            intent: .defaultIntent
-                        )!
-                    }
+                if album.cover != coverData {
+                    coverData = album.cover
+                    coverImage = coverData.map { loadImage(from: $0) }
                 }
                 nowPlayingCenter.nowPlayingInfo = [
                     MPMediaItemPropertyPlaybackDuration: Double(track.end.value - track.start.value) / Double(Timestamp.timescale),

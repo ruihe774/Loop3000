@@ -293,8 +293,8 @@ struct MetadataView: View {
     @EnvironmentObject private var model: ViewModel
 
     private let viewItem: PlaylistViewItem
-    private var coverJPEG: Data? {
-        viewItem.album.coverJPEG
+    private var coverData: Data? {
+        viewItem.album.cover
     }
     @State private var coverImage: CGImage?
 
@@ -367,21 +367,14 @@ struct MetadataView: View {
             .background(.thickMaterial)
         }
         .frame(width: 250)
-        .onChange(of: coverJPEG, perform: updateImage)
+        .onChange(of: coverData, perform: updateImage)
         .onAppear {
-            updateImage(coverJPEG)
+            updateImage(coverData)
         }
     }
 
-    private func updateImage(_ coverJPEG: Data?) {
-        coverImage = coverJPEG.map { data in
-            CGImage(
-                jpegDataProviderSource: CGDataProvider(data: data as CFData)!,
-                decode: nil,
-                shouldInterpolate: true,
-                intent: .defaultIntent
-            )!
-        }
+    private func updateImage(_ coverData: Data?) {
+        coverImage = coverData.map { loadImage(from: $0) }
     }
 }
 
