@@ -10,14 +10,12 @@ class Scaler {
 
     private let device: MTLDevice
     private let cmdQueue: MTLCommandQueue
-    private let cmdBuffer: MTLCommandBuffer
     private var scalers: [MTLFXSpatialScalerDescriptor: MTLFXSpatialScaler] = [:]
-    private let cictx: CIContext
+    let cictx: CIContext
 
     init(device dev: MTLDevice) {
         device = dev
         cmdQueue = device.makeCommandQueue()!
-        cmdBuffer = cmdQueue.makeCommandBuffer()!
         cictx = CIContext(mtlDevice: device)
     }
 
@@ -45,55 +43,52 @@ class Scaler {
         return scaler
     }
 
-    func scale(textures: [MTLTexture], to sizes: [Resolution]) -> [MTLTexture] {
-        let descs = zip(textures, sizes).map { makeSpatialScalerDescriptor(for: $0, to: $1) }
-        let outputs = zip(textures, descs).map { inputTexture, desc in
-            let outputTextureDesc = MTLTextureDescriptor.texture2DDescriptor(
-                pixelFormat: desc.outputTextureFormat,
-                width: desc.outputWidth,
-                height: desc.outputHeight,
-                mipmapped: false
-            )
-            outputTextureDesc.usage = [.renderTarget, .shaderRead]
-            let outputTexture = device.makeTexture(descriptor: outputTextureDesc)!
-            let scaler = getSpatialScaler(for: desc)
-            scaler.colorTexture = inputTexture
-            scaler.outputTexture = outputTexture
-            scaler.encode(commandBuffer: cmdBuffer)
-            scaler.colorTexture = nil
-            scaler.outputTexture = nil
-            return outputTexture
-        }
-        cmdBuffer.commit()
-        cmdBuffer.waitUntilCompleted()
-        return outputs
-    }
-
-    func scale(images: [CIImage], to sizes: [Resolution]) -> [CIImage] {
-        let inputTextures = images.map { ciimg in
-            let desc = MTLTextureDescriptor.texture2DDescriptor(
-                pixelFormat: .rgba16Float,
-                width: Int(ciimg.extent.width),
-                height: Int(ciimg.extent.height),
-                mipmapped: false
-            )
-            desc.usage = [.shaderWrite, .shaderRead]
-            let tex = device.makeTexture(descriptor: desc)!
-            cictx.render(
-                ciimg,
-                to: tex,
-                commandBuffer: cmdBuffer,
-                bounds: ciimg.extent,
-                colorSpace: CGColorSpace(name: CGColorSpace.linearSRGB)!
-            )
-            return tex
-        }
-        let outputTextures = scale(textures: inputTextures, to: sizes)
-        return outputTextures.map { texture in
-            let image = CIImage(mtlTexture: texture, options: [
-                .colorSpace: CGColorSpace(name: CGColorSpace.linearSRGB)!,
-            ])!
-            return image
+    func scale(images: [CIImage], to sizes: [Resolution]) async -> [CIImage] {
+        return await withCheckedContinuation { continuation in
+            let cmdBuffer = cmdQueue.makeCommandBuffer()!
+            let outputTextures = zip(images, sizes).map { (image, size) in
+                let inputTextureDesc = MTLTextureDescriptor.texture2DDescriptor(
+                    pixelFormat: .rgba16Float,
+                    width: Int(image.extent.width),
+                    height: Int(image.extent.height),
+                    mipmapped: false
+                )
+                inputTextureDesc.usage = [.shaderWrite, .shaderRead]
+                let inputTexture = device.makeTexture(descriptor: inputTextureDesc)!
+                cictx.render(
+                    image,
+                    to: inputTexture,
+                    commandBuffer: cmdBuffer,
+                    bounds: image.extent,
+                    colorSpace: CGColorSpace(name: CGColorSpace.linearSRGB)!
+                )
+                let scaleDesc = makeSpatialScalerDescriptor(for: inputTexture, to: size)
+                let outputTextureDesc = MTLTextureDescriptor.texture2DDescriptor(
+                    pixelFormat: scaleDesc.outputTextureFormat,
+                    width: scaleDesc.outputWidth,
+                    height: scaleDesc.outputHeight,
+                    mipmapped: false
+                )
+                outputTextureDesc.usage = [.renderTarget, .shaderRead]
+                let outputTexture = device.makeTexture(descriptor: outputTextureDesc)!
+                let scaler = getSpatialScaler(for: scaleDesc)
+                scaler.colorTexture = inputTexture
+                scaler.outputTexture = outputTexture
+                scaler.encode(commandBuffer: cmdBuffer)
+                scaler.colorTexture = nil
+                scaler.outputTexture = nil
+                return outputTexture
+            }
+            cmdBuffer.addCompletedHandler { _ in
+                DispatchQueue.global().async {
+                    continuation.resume(returning: outputTextures.map { texture in
+                        CIImage(mtlTexture: texture, options: [
+                            .colorSpace: CGColorSpace(name: CGColorSpace.linearSRGB)!,
+                        ])!
+                    })
+                }
+            }
+            cmdBuffer.commit()
         }
     }
 }

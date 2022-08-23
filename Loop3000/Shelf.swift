@@ -955,18 +955,28 @@ extension Shelf {
             return (images, errors)
         }
         let originalImages = images.map { $0.1 }
-        let scaledImages = scaler.scale(images: originalImages.map { CIImage(cgImage: $0) }, to: originalImages.map { image in
+        let scaledImages = await scaler.scale(images: originalImages.map { CIImage(cgImage: $0) }, to: originalImages.map { image in
             let newWidth = 600
             let newHeight = image.height * 600 / image.width
             return Scaler.Resolution(width: newWidth, height: newHeight)
         })
-        let cictx = CIContext()
-        for (album, image) in zip(images.map { $0.0 }, scaledImages) {
-            album.coverJPEG = cictx.jpegRepresentation(
-                of: image,
-                colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
-                options: [.init(rawValue: kCGImageDestinationLossyCompressionQuality as String): 0.75]
-            )!
+        let cictx = scaler.cictx
+        await withTaskGroup(of: Void.self) { taskGroup in
+            for (album, image) in zip(images.map { $0.0 }, scaledImages) {
+                taskGroup.addTask {
+                    await withCheckedContinuation { continuation in
+                        DispatchQueue.global().async {
+                            album.coverJPEG = cictx.jpegRepresentation(
+                                of: image,
+                                colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                options: [.init(rawValue: kCGImageDestinationLossyCompressionQuality as String): 0.75]
+                            )!
+                            continuation.resume()
+                        }
+                    }
+                }
+            }
+            await taskGroup.reduce((), { (_, _) in () })
         }
         return errors
     }
