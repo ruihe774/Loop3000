@@ -1,4 +1,6 @@
 import Foundation
+import CoreGraphics
+import CoreImage
 import AVFoundation
 import UniformTypeIdentifiers
 
@@ -145,6 +147,7 @@ struct MetadataCommonKey {
 class Album: Unicorn, Codable {
     private(set) var id = makeMonotonicUUID()
     var metadata = Metadata()
+    var coverJPEG: Data?
 }
 
 class Track: Unicorn, Codable {
@@ -301,6 +304,46 @@ struct Shelf: Codable {
             return albumL.id < albumR.id
         }
     }
+
+    func consolidateMetadata() {
+        for album in albums {
+            let tracks = getTracks(for: album)
+            if tracks.count < 2 { continue }
+            for (key, _) in tracks.first!.metadata {
+                switch key {
+                case
+                    MetadataCommonKey.trackNumber,
+                    MetadataCommonKey.discNumber,
+                    MetadataCommonKey.ISRC,
+                    "TOTALDISCS",
+                    "TOTALTRACKS",
+                    "DISCTOTAL",
+                    "TRACKTOTAL":
+                    ()
+                default:
+                    if let value = commonMetadata(tracks, for: key) {
+                        if album.metadata[key] == nil {
+                            album.metadata[key] = value
+                        }
+                        if album.metadata[key] == value {
+                            for track in tracks {
+                                track.metadata[key] = nil
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    mutating func sort() {
+        albums = sorted(albums: albums)
+        tracks = sorted(tracks: tracks)
+    }
+
+    mutating func merge(with other: Shelf) {
+        self = mergeShelf(self, other)
+    }
 }
 
 protocol RequestTracer {
@@ -429,7 +472,7 @@ async throws -> (albums: [Album], tracks: [Track], errors: [Error]) {
     return r
 }
 
-func mergeShelf(_ a: Shelf, _ b: Shelf) -> Shelf {
+fileprivate func mergeShelf(_ a: Shelf, _ b: Shelf) -> Shelf {
     var mergedShelf = Shelf()
 
     var trackIdMap: [UUID: UUID] = [:]
@@ -478,35 +521,6 @@ func mergeShelf(_ a: Shelf, _ b: Shelf) -> Shelf {
         }
     }
     mergedShelf.manualPlaylists = consolidatedPlaylists
-
-    for album in mergedShelf.albums {
-        let tracks = mergedShelf.getTracks(for: album)
-        if tracks.count < 2 { continue }
-        for (key, _) in tracks.first!.metadata {
-            switch key {
-            case
-                MetadataCommonKey.trackNumber,
-                MetadataCommonKey.discNumber,
-                MetadataCommonKey.ISRC,
-                "TOTALDISCS",
-                "TOTALTRACKS",
-                "DISCTOTAL",
-                "TRACKTOTAL":
-                ()
-            default:
-                if let value = commonMetadata(tracks, for: key) {
-                    if album.metadata[key] == nil {
-                        album.metadata[key] = value
-                    }
-                    if album.metadata[key] == value {
-                        for track in tracks {
-                            track.metadata[key] = nil
-                        }
-                    }
-                }
-            }
-        }
-    }
 
     return mergedShelf
 }
@@ -583,13 +597,6 @@ fileprivate func mergeAlbums(_ a: Album, _ tracksA: [Track], _ b: Album, _ track
         track.albumId = selected.id
     }
     return selected
-}
-
-func sortedShelf(_ shelf: Shelf) -> Shelf {
-    var sortedShelf = shelf
-    sortedShelf.albums = sortedShelf.sorted(albums: sortedShelf.albums)
-    sortedShelf.tracks = sortedShelf.sorted(tracks: sortedShelf.tracks)
-    return sortedShelf
 }
 
 fileprivate func commonMetadata(_ tracks: [Track], for key: String) -> String? {
@@ -886,5 +893,110 @@ fileprivate class AVGrabber: MetadataGrabber {
             metadata[mappedKey] = value
         }
         return metadata
+    }
+}
+
+protocol ArtworkLoader {
+    var supportedTypes: [UTType] { get }
+
+    func loadCoverJPEG(from url: URL) async throws -> Data?
+}
+
+var artworkLoaders: [any ArtworkLoader] = [CGArtworkLoader()]
+
+extension Shelf {
+    func loadArtwork(for album: Album) async throws {
+        guard album.coverJPEG == nil else { return }
+        let tracks = getTracks(for: album)
+        let firstTrack = sorted(tracks: tracks).first!
+        if firstTrack.source.isFileURL {
+            let fileManager = FileManager.default
+            let directory = firstTrack.source.deletingLastPathComponent()
+            let children = try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: [])
+                .filter { $0.deletingPathExtension().lastPathComponent.lowercased() == "cover" }
+            for loader in artworkLoaders {
+                guard let image = children.first(where: { url in
+                    guard let type = UTType(filenameExtension: url.pathExtension) else { return false }
+                    return loader.supportedTypes.contains { type.conforms(to: $0) }
+                }) else { continue }
+                guard let imageData = try await loader.loadCoverJPEG(from: image) else { continue }
+                album.coverJPEG = imageData
+                break
+            }
+        }
+        if album.coverJPEG == nil {
+            let type = UTType(filenameExtension: firstTrack.source.pathExtension)!
+            for loader in artworkLoaders {
+                guard loader.supportedTypes.contains(where: { type.conforms(to: $0) }) else { continue }
+                guard let imageData = try await loader.loadCoverJPEG(from: firstTrack.source) else { continue }
+                album.coverJPEG = imageData
+                break
+            }
+        }
+    }
+
+    func loadAllArtworks() async -> [Error] {
+        return await withTaskGroup(of: Error?.self) { taskGroup in
+            for album in albums {
+                taskGroup.addTask {
+                    do {
+                        try await loadArtwork(for: album)
+                    } catch let error {
+                        return error
+                    }
+                    return nil
+                }
+            }
+            return await taskGroup
+                .compactMap { $0 }
+                .reduce(into: [Error]()) { $0.append($1) }
+        }
+    }
+}
+
+fileprivate func scaleLargeImageTo600(_ image: CGImage) -> CGImage {
+    if image.width > 600 {
+        let newWidth = 600
+        let newHeight = image.height * 600 / image.width
+        let ctx = CGContext(
+            data: nil,
+            width: newWidth,
+            height: newHeight,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!,
+            bitmapInfo: CGImageAlphaInfo.noneSkipFirst.rawValue
+        )!
+        ctx.interpolationQuality = .high
+        ctx.draw(image, in: CGRect(x: 0, y: 0, width: newWidth, height: newHeight))
+        return ctx.makeImage()!
+    } else {
+        return image
+    }
+}
+
+class CGArtworkLoader: ArtworkLoader {
+    let supportedTypes = [UTType.jpeg, UTType.png]
+
+    private let cictx = CIContext()
+
+    func loadCoverJPEG(from url: URL) async throws -> Data? {
+        let type = UTType(filenameExtension: url.pathExtension)!
+        guard let dataProvider = CGDataProvider(url: url as CFURL) else {
+            throw FileNotFound(url: url)
+        }
+        guard let image = (type.conforms(to: .jpeg)
+            ? CGImage(jpegDataProviderSource: dataProvider, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
+            : CGImage(pngDataProviderSource: dataProvider, decode: nil, shouldInterpolate: true, intent: .defaultIntent))
+            .map({ scaleLargeImageTo600($0) })
+        else {
+            throw InvalidFormat(url: url)
+        }
+        let ciimage = CIImage(cgImage: image)
+        return cictx.jpegRepresentation(
+            of: ciimage,
+            colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
+            options: [.init(rawValue: kCGImageDestinationLossyCompressionQuality as String): 0.8]
+        )!
     }
 }

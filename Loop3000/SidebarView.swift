@@ -87,7 +87,7 @@ struct Sidebar: View {
         }
         .scenePadding([.leading, .trailing])
         .padding([.top, .bottom], 30)
-        .frame(width: 300)
+        .frame(width: 250)
         .background(SidebarMaterial())
         .onAppear {
             guard let selectedList = model.selectedList else { return }

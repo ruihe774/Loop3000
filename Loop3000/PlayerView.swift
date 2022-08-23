@@ -70,7 +70,7 @@ struct PlayerView: View {
         .padding(.bottom, 28)
     }
 
-    func updateDuration(_ itemId: UUID?) {
+    private func updateDuration(_ itemId: UUID?) {
         if let track = itemId
             .flatMap({ model.musicLibrary.locatePlaylistItem(by: $0)?.1 })
             .map({ model.musicLibrary.getTrack(by: $0.trackId) }) {
@@ -78,7 +78,7 @@ struct PlayerView: View {
         }
     }
 
-    func updateTimestamp(_ timestamp: Timestamp) {
+    private func updateTimestamp(_ timestamp: Timestamp) {
         guard !editing else { return }
         sliderValue = Double(timestamp.value) / Double(duration)
     }

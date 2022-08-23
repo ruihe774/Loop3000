@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreGraphics
 
 fileprivate struct PlaylistViewItem: Unicorn {
     let id: UUID
@@ -14,16 +15,27 @@ fileprivate struct PlaylistViewItem: Unicorn {
             .filter { !$0.isEmpty }
     }
 
-    var title: String {
-        track.metadata[MetadataCommonKey.title] ?? track.source.lastPathComponent
+    var title: String? {
+        track.metadata[MetadataCommonKey.title]
+    }
+
+    var uiTitle: String {
+        title ?? track.source.lastPathComponent
     }
 
     var artists: [String] {
-        universalSplit(
-            track.metadata[MetadataCommonKey.artist] ??
-            album.metadata[MetadataCommonKey.artist] ??
-            ""
-        )
+        let artistsString = track.metadata[MetadataCommonKey.artist]
+            ?? album.metadata[MetadataCommonKey.artist]
+            ?? ""
+        switch artistsString {
+        case "Various Artists": fallthrough
+        case "V.A.": fallthrough
+        case "VA": return []
+        default:
+            return universalSplit(
+                artistsString
+            )
+        }
     }
 
     var trackNumber: Int? {
@@ -48,17 +60,23 @@ fileprivate struct PlaylistViewItem: Unicorn {
     }
 
     var albumArtists: [String] {
-        universalSplit(
-            album.metadata[MetadataCommonKey.artist] ??
-            ""
-        )
+        let artistsString = album.metadata[MetadataCommonKey.artist] ?? ""
+        switch artistsString {
+        case "Various Artists": fallthrough
+        case "V.A.": fallthrough
+        case "VA": return []
+        default:
+            return universalSplit(
+                artistsString
+            )
+        }
     }
 
     var combinedTitle: String {
         if !artists.isEmpty && artists != albumArtists {
-            return title + " / " + artists.joined(separator: "; ")
+            return uiTitle + " / " + artists.joined(separator: "; ")
         } else {
-            return title
+            return uiTitle
         }
     }
 
@@ -194,6 +212,17 @@ struct PlaylistView: View {
         }
         return sections
     }
+    private var selectedViewItem: PlaylistViewItem? {
+        guard let (list, item) = model.selectedItem.flatMap({ model.musicLibrary.locatePlaylistItem(by: $0) }) else {
+            return nil
+        }
+        guard list == playlist else {
+            return nil
+        }
+        let track = model.musicLibrary.getTrack(by: item.trackId)
+        let album = model.musicLibrary.getAlbum(for: track)
+        return PlaylistViewItem(track: track, album: album, playlistItem: item, playlist: list)
+    }
 
     init(tracks: [Track]) {
         self.tracks = tracks
@@ -206,13 +235,142 @@ struct PlaylistView: View {
     }
 
     var body: some View {
-        List(sections) { section in
-            let items = section.items
-            Section(items.first!.combinedAlbumTitle ?? "<No Title>") {
-                ForEach(items) { item in
-                    PlaylistItemView(item)
+        HStack(spacing: 0) {
+            List(sections) { section in
+                let items = section.items
+                Section(items.first!.combinedAlbumTitle ?? "<No Title>") {
+                    ForEach(items) { item in
+                        PlaylistItemView(item)
+                    }
                 }
+            }
+            if let selectedViewItem {
+                Divider()
+                MetadataView(selectedViewItem)
             }
         }
     }
 }
+
+struct MetadataItemView: View {
+    private let label: String
+    private let text: String
+    private let scrollable: Bool
+
+    fileprivate init(label: String, text: String, scrollable: Bool = false) {
+        self.label = label
+        self.text = text
+        self.scrollable = scrollable
+    }
+
+    var body: some View {
+        HStack {
+            Text(label)
+                .foregroundColor(.secondary)
+            Spacer(minLength: 15)
+            if scrollable {
+                ScrollView(.horizontal) {
+                    Text(text)
+                        .textSelection(.enabled)
+                }
+                .scrollIndicators(.never)
+            } else {
+                Text(text)
+                    .textSelection(.enabled)
+                    .multilineTextAlignment(.trailing)
+            }
+        }
+        .font(.caption.weight(.medium))
+    }
+}
+
+struct MetadataView: View {
+    @EnvironmentObject private var model: ViewModel
+
+    private let viewItem: PlaylistViewItem
+    private var coverJPEG: Data? {
+        viewItem.album.coverJPEG
+    }
+    @State private var coverImage: CGImage?
+
+    fileprivate init(_ viewItem: PlaylistViewItem) {
+        self.viewItem = viewItem
+    }
+
+    var body: some View {
+        ZStack {
+            if let coverImage {
+                GeometryReader { geo in
+                    Image(coverImage, scale: 1, label: Text("Background"))
+                        .resizable()
+                        .frame(height: geo.size.height)
+                }
+            } else {
+                Rectangle().fill(Color(nsColor: .controlBackgroundColor))
+            }
+            VStack {
+                if let coverImage {
+                    Image(coverImage, scale: 1, label: Text("Cover Artwork"))
+                        .resizable()
+                        .scaledToFit()
+                        .shadow(radius: 1)
+                }
+                VStack(spacing: 5) {
+                    if let title = viewItem.title {
+                        MetadataItemView(label: "Title", text: title)
+                    }
+                    if let album = viewItem.albumTitle {
+                        MetadataItemView(label: "Album", text: album)
+                    }
+                    let artists = viewItem.artists
+                    if !artists.isEmpty {
+                        let artistLabel = artists.count > 1 ? "Artists" : "Artist"
+                        MetadataItemView(label: artistLabel, text: artists.joined(separator: "\n"))
+                    }
+                    let albumArtists = viewItem.albumArtists
+                    if !albumArtists.isEmpty && artists != albumArtists {
+                        let artistLabel = albumArtists.count > 1 ? "Artists" : "Artist"
+                        MetadataItemView(label: "Album " + artistLabel, text: albumArtists.joined(separator: "\n"))
+                    }
+                    if let discNumber = viewItem.discNumber {
+                        MetadataItemView(label: "Disc Number", text: "\(discNumber)")
+                    }
+                    if let trackNumber = viewItem.trackNumber {
+                        MetadataItemView(label: "Track Number", text: "\(trackNumber)")
+                    }
+                    if let duration = viewItem.duration {
+                        MetadataItemView(label: "Duration", text: duration)
+                    }
+                    // XXX: Add more field
+                    let isFile = viewItem.track.source.isFileURL
+                    MetadataItemView(
+                        label: isFile ? "File" : "URL",
+                        text: isFile ? viewItem.track.source.path : viewItem.track.source.description,
+                        scrollable: true
+                    )
+                }
+                .padding()
+                Spacer()
+            }
+            .padding()
+            .background(.thickMaterial)
+        }
+        .frame(width: 250)
+        .onChange(of: coverJPEG, perform: updateImage)
+        .onAppear {
+            updateImage(coverJPEG)
+        }
+    }
+
+    private func updateImage(_ coverJPEG: Data?) {
+        coverImage = coverJPEG.map { data in
+            CGImage(
+                jpegDataProviderSource: CGDataProvider(data: data as CFData)!,
+                decode: nil,
+                shouldInterpolate: true,
+                intent: .defaultIntent
+            )!
+        }
+    }
+}
+

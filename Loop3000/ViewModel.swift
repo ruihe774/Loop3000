@@ -120,20 +120,28 @@ class MusicLibrary: ObservableObject {
         perform {
             self.clearResult()
             let (albums, tracks) = try await scanMedia(at: url, tracer: self.tracer)
-            let newShelf = Shelf(albums: albums, tracks: tracks)
-            self.shelfOO = sortedShelf(mergeShelf(self.shelf, newShelf))
+            var newShelf = self.shelf
+            newShelf.merge(with: Shelf(albums: albums, tracks: tracks))
+            newShelf.consolidateMetadata()
+            let errors = await newShelf.loadAllArtworks()
+            newShelf.sort()
+            self.shelfOO = newShelf
             self.importedAlbumsOO = albums.filter { self.shelfOO.albums.contains($0) }
             self.importedTracksOO = tracks.filter { self.shelfOO.tracks.contains($0) }
-            return []
+            return errors
         }
     }
 
     func performDiscoverMedia(at url: URL, recursive: Bool = false) {
         perform {
             self.clearResult()
-            let (albums, tracks, errors) = try await discoverMedia(at: url, recursive: recursive, tracer: self.tracer)
-            let newShelf = Shelf(albums: albums, tracks: tracks)
-            self.shelfOO = sortedShelf(mergeShelf(self.shelf, newShelf))
+            var (albums, tracks, errors) = try await discoverMedia(at: url, recursive: recursive, tracer: self.tracer)
+            var newShelf = self.shelf
+            newShelf.merge(with: Shelf(albums: albums, tracks: tracks))
+            newShelf.consolidateMetadata()
+            errors.append(contentsOf: await newShelf.loadAllArtworks())
+            newShelf.sort()
+            self.shelfOO = newShelf
             self.importedAlbumsOO = albums.filter { self.shelfOO.albums.contains($0) }
             self.importedTracksOO = tracks.filter { self.shelfOO.tracks.contains($0) }
             return errors
