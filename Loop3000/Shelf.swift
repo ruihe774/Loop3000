@@ -899,14 +899,15 @@ fileprivate class AVGrabber: MetadataGrabber {
 protocol ArtworkLoader {
     var supportedTypes: [UTType] { get }
 
-    func loadCoverJPEG(from url: URL) async throws -> Data?
+    func loadCover(from url: URL, tracer: RequestTracer?) async throws -> CGImage?
 }
 
 var artworkLoaders: [any ArtworkLoader] = [CGArtworkLoader()]
 
+fileprivate let scaler = Scaler()
+
 extension Shelf {
-    func loadArtwork(for album: Album) async throws {
-        guard album.coverJPEG == nil else { return }
+    private func loadOriginalArtwork(for album: Album, tracer: RequestTracer? = nil) async throws -> CGImage? {
         let tracks = getTracks(for: album)
         let firstTrack = sorted(tracks: tracks).first!
         if firstTrack.source.isFileURL {
@@ -919,59 +920,55 @@ extension Shelf {
                     guard let type = UTType(filenameExtension: url.pathExtension) else { return false }
                     return loader.supportedTypes.contains { type.conforms(to: $0) }
                 }) else { continue }
-                guard let imageData = try await loader.loadCoverJPEG(from: image) else { continue }
-                album.coverJPEG = imageData
-                break
+                guard let cgImage = try await loader.loadCover(from: image, tracer: tracer) else { continue }
+                return cgImage
             }
         }
-        if album.coverJPEG == nil {
-            let type = UTType(filenameExtension: firstTrack.source.pathExtension)!
-            for loader in artworkLoaders {
-                guard loader.supportedTypes.contains(where: { type.conforms(to: $0) }) else { continue }
-                guard let imageData = try await loader.loadCoverJPEG(from: firstTrack.source) else { continue }
-                album.coverJPEG = imageData
-                break
-            }
+        let type = UTType(filenameExtension: firstTrack.source.pathExtension)!
+        for loader in artworkLoaders {
+            guard loader.supportedTypes.contains(where: { type.conforms(to: $0) }) else { continue }
+            guard let cgImage = try await loader.loadCover(from: firstTrack.source, tracer: tracer) else { continue }
+            return cgImage
         }
+        return nil
     }
 
-    func loadAllArtworks() async -> [Error] {
-        return await withTaskGroup(of: Error?.self) { taskGroup in
+    func loadAllArtworks(tracer: RequestTracer? = nil) async -> [Error] {
+        let (images, errors) = await withTaskGroup(of: (Album, CGImage?, Error?).self) { taskGroup in
             for album in albums {
-                taskGroup.addTask {
-                    do {
-                        try await loadArtwork(for: album)
-                    } catch let error {
-                        return error
+                if album.coverJPEG == nil {
+                    taskGroup.addTask {
+                        do {
+                            return (album, try await loadOriginalArtwork(for: album, tracer: tracer), nil)
+                        } catch let error {
+                            return (album, nil, error)
+                        }
                     }
-                    return nil
                 }
             }
-            return await taskGroup
-                .compactMap { $0 }
-                .reduce(into: [Error]()) { $0.append($1) }
+            var errors: [Error] = []
+            var images: [(Album, CGImage)] = []
+            for await item in taskGroup {
+                item.1.map { images.append((item.0, $0)) }
+                item.2.map { errors.append($0) }
+            }
+            return (images, errors)
         }
-    }
-}
-
-fileprivate func scaleLargeImageTo600(_ image: CGImage) -> CGImage {
-    if image.width > 600 {
-        let newWidth = 600
-        let newHeight = image.height * 600 / image.width
-        let ctx = CGContext(
-            data: nil,
-            width: newWidth,
-            height: newHeight,
-            bitsPerComponent: 8,
-            bytesPerRow: 0,
-            space: CGColorSpace(name: CGColorSpace.sRGB)!,
-            bitmapInfo: CGImageAlphaInfo.noneSkipFirst.rawValue
-        )!
-        ctx.interpolationQuality = .high
-        ctx.draw(image, in: CGRect(x: 0, y: 0, width: newWidth, height: newHeight))
-        return ctx.makeImage()!
-    } else {
-        return image
+        let originalImages = images.map { $0.1 }
+        let scaledImages = scaler.scale(images: originalImages.map { CIImage(cgImage: $0) }, to: originalImages.map { image in
+            let newWidth = 600
+            let newHeight = image.height * 600 / image.width
+            return Scaler.Resolution(width: newWidth, height: newHeight)
+        })
+        let cictx = CIContext()
+        for (album, image) in zip(images.map { $0.0 }, scaledImages) {
+            album.coverJPEG = cictx.jpegRepresentation(
+                of: image,
+                colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
+                options: [.init(rawValue: kCGImageDestinationLossyCompressionQuality as String): 0.75]
+            )!
+        }
+        return errors
     }
 }
 
@@ -980,23 +977,19 @@ class CGArtworkLoader: ArtworkLoader {
 
     private let cictx = CIContext()
 
-    func loadCoverJPEG(from url: URL) async throws -> Data? {
+    func loadCover(from url: URL, tracer: RequestTracer? = nil) async throws -> CGImage? {
+        tracer?.add(url)
+        defer { tracer?.remove(url) }
         let type = UTType(filenameExtension: url.pathExtension)!
         guard let dataProvider = CGDataProvider(url: url as CFURL) else {
             throw FileNotFound(url: url)
         }
-        guard let image = (type.conforms(to: .jpeg)
+        guard let image = type.conforms(to: .jpeg)
             ? CGImage(jpegDataProviderSource: dataProvider, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
-            : CGImage(pngDataProviderSource: dataProvider, decode: nil, shouldInterpolate: true, intent: .defaultIntent))
-            .map({ scaleLargeImageTo600($0) })
+            : CGImage(pngDataProviderSource: dataProvider, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
         else {
             throw InvalidFormat(url: url)
         }
-        let ciimage = CIImage(cgImage: image)
-        return cictx.jpegRepresentation(
-            of: ciimage,
-            colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
-            options: [.init(rawValue: kCGImageDestinationLossyCompressionQuality as String): 0.8]
-        )!
+        return image
     }
 }

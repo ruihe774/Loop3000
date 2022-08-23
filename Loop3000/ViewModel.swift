@@ -126,7 +126,7 @@ class MusicLibrary: ObservableObject {
             var newShelf = self.shelf
             newShelf.merge(with: Shelf(albums: albums, tracks: tracks))
             newShelf.consolidateMetadata()
-            let errors = await newShelf.loadAllArtworks()
+            let errors = await newShelf.loadAllArtworks(tracer: self.tracer)
             newShelf.sort()
             self.shelfOO = newShelf
             self.importedAlbumsOO = albums.filter { self.shelfOO.albums.contains($0) }
@@ -142,7 +142,7 @@ class MusicLibrary: ObservableObject {
             var newShelf = self.shelf
             newShelf.merge(with: Shelf(albums: albums, tracks: tracks))
             newShelf.consolidateMetadata()
-            errors.append(contentsOf: await newShelf.loadAllArtworks())
+            errors.append(contentsOf: await newShelf.loadAllArtworks(tracer: self.tracer))
             newShelf.sort()
             self.shelfOO = newShelf
             self.importedAlbumsOO = albums.filter { self.shelfOO.albums.contains($0) }

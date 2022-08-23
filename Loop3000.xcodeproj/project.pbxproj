@@ -14,6 +14,7 @@
 		66684C7628A7C28800C32BC8 /* ViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66684C7528A7C28800C32BC8 /* ViewModel.swift */; };
 		66684C7828A7FC6700C32BC8 /* DiscoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66684C7728A7FC6700C32BC8 /* DiscoverView.swift */; };
 		66684C7C28A823A500C32BC8 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66684C7B28A823A500C32BC8 /* SidebarView.swift */; };
+		666A2C2C28B4CC66006172A5 /* Scaler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 666A2C2B28B4CC66006172A5 /* Scaler.swift */; };
 		666BD94F28B04303006E0408 /* libogg.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 666BD94D28B04303006E0408 /* libogg.a */; };
 		666BD95028B04303006E0408 /* libFLAC.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 666BD94E28B04303006E0408 /* libFLAC.a */; };
 		669C586128A47B4D0038A986 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 669C586028A47B4D0038A986 /* App.swift */; };
@@ -30,6 +31,7 @@
 		66684C7528A7C28800C32BC8 /* ViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewModel.swift; sourceTree = "<group>"; };
 		66684C7728A7FC6700C32BC8 /* DiscoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverView.swift; sourceTree = "<group>"; };
 		66684C7B28A823A500C32BC8 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
+		666A2C2B28B4CC66006172A5 /* Scaler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Scaler.swift; sourceTree = "<group>"; };
 		666BD94928B04269006E0408 /* Bridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Bridge.h; sourceTree = "<group>"; };
 		666BD94D28B04303006E0408 /* libogg.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libogg.a; sourceTree = "<group>"; };
 		666BD94E28B04303006E0408 /* libFLAC.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libFLAC.a; sourceTree = "<group>"; };
@@ -97,6 +99,7 @@
 				6604F69E28A90F4400B84549 /* PlaylistView.swift */,
 				6604F6A028A92BF900B84549 /* PlayerView.swift */,
 				662C8ABF28AF8C5C003983FE /* Util.swift */,
+				666A2C2B28B4CC66006172A5 /* Scaler.swift */,
 				666BD94928B04269006E0408 /* Bridge.h */,
 			);
 			path = Loop3000;
@@ -186,6 +189,7 @@
 				662C8AC028AF8C5C003983FE /* Util.swift in Sources */,
 				66684C7C28A823A500C32BC8 /* SidebarView.swift in Sources */,
 				66684C7828A7FC6700C32BC8 /* DiscoverView.swift in Sources */,
+				666A2C2C28B4CC66006172A5 /* Scaler.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
