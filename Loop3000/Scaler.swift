@@ -10,7 +10,6 @@ class Scaler {
 
     private let device: MTLDevice
     private let cmdQueue: MTLCommandQueue
-    private var scalers: [MTLFXSpatialScalerDescriptor: MTLFXSpatialScaler] = [:]
     let cictx: CIContext
 
     init(device dev: MTLDevice) {
@@ -23,28 +22,14 @@ class Scaler {
         self.init(device: MTLCreateSystemDefaultDevice()!)
     }
 
-    private func makeSpatialScalerDescriptor(for inputTexture: MTLTexture,
-                                             to size: Resolution) -> MTLFXSpatialScalerDescriptor
-    {
-        let desc = MTLFXSpatialScalerDescriptor()
-        desc.inputWidth = inputTexture.width
-        desc.inputHeight = inputTexture.height
-        desc.colorTextureFormat = inputTexture.pixelFormat
-        desc.outputWidth = size.width
-        desc.outputHeight = size.height
-        desc.outputTextureFormat = inputTexture.pixelFormat
-        desc.colorProcessingMode = .linear
-        return desc
-    }
-
-    private func getSpatialScaler(for desc: MTLFXSpatialScalerDescriptor) -> MTLFXSpatialScaler {
-        let scaler = scalers[desc] ?? desc.makeSpatialScaler(device: device)!
-        scalers[desc] = scaler
-        return scaler
-    }
-
     func scale(images: [CIImage], to sizes: [Resolution]) async -> [CIImage] {
         return await withCheckedContinuation { continuation in
+            var scalers: [MTLFXSpatialScalerDescriptor: MTLFXSpatialScaler] = [:]
+            func getSpatialScaler(for desc: MTLFXSpatialScalerDescriptor) -> MTLFXSpatialScaler {
+                let scaler = scalers[desc] ?? desc.makeSpatialScaler(device: device)!
+                scalers[desc] = scaler
+                return scaler
+            }
             let cmdBuffer = cmdQueue.makeCommandBuffer()!
             let outputTextures = zip(images, sizes).map { (image, size) in
                 let inputTextureDesc = MTLTextureDescriptor.texture2DDescriptor(
@@ -75,20 +60,30 @@ class Scaler {
                 scaler.colorTexture = inputTexture
                 scaler.outputTexture = outputTexture
                 scaler.encode(commandBuffer: cmdBuffer)
-                scaler.colorTexture = nil
-                scaler.outputTexture = nil
                 return outputTexture
             }
             cmdBuffer.addCompletedHandler { _ in
-                DispatchQueue.global().async {
-                    continuation.resume(returning: outputTextures.map { texture in
-                        CIImage(mtlTexture: texture, options: [
-                            .colorSpace: CGColorSpace(name: CGColorSpace.linearSRGB)!,
-                        ])!
-                    })
-                }
+                continuation.resume(returning: outputTextures)
             }
             cmdBuffer.commit()
+        }.map { texture in
+            CIImage(mtlTexture: texture, options: [
+                .colorSpace: CGColorSpace(name: CGColorSpace.linearSRGB)!,
+            ])!
         }
     }
+}
+
+fileprivate func makeSpatialScalerDescriptor(for inputTexture: MTLTexture,
+                                             to size: Scaler.Resolution) -> MTLFXSpatialScalerDescriptor
+{
+    let desc = MTLFXSpatialScalerDescriptor()
+    desc.inputWidth = inputTexture.width
+    desc.inputHeight = inputTexture.height
+    desc.colorTextureFormat = inputTexture.pixelFormat
+    desc.outputWidth = size.width
+    desc.outputHeight = size.height
+    desc.outputTextureFormat = inputTexture.pixelFormat
+    desc.colorProcessingMode = .linear
+    return desc
 }
