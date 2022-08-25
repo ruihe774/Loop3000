@@ -2,7 +2,7 @@ import Foundation
 import AVFoundation
 import UniformTypeIdentifiers
 
-extension Timestamp {
+extension CueTime {
     func toSample(atRate rate: Int) -> Int {
         value * rate / Self.timescale
     }
@@ -71,13 +71,13 @@ class PlaybackScheduler {
         }
     }
 
-    var currentTimestamp: Timestamp {
+    var currentTimestamp: CueTime {
         var time = (trailingUntil != .invalid && synchronizer.currentTime() >= trailingUntil
                     ? bufferedForNextTrack : bufferedForCurrentTrack)
         if bufferedUntil != .zero {
             time = time + (self.synchronizer.currentTime() - bufferedUntil)
         }
-        return Timestamp(from: max(time, .zero))
+        return CueTime(from: max(time, .zero))
     }
 
     init() {
@@ -180,7 +180,7 @@ class PlaybackScheduler {
         }
     }
 
-    func seek(to time: Timestamp) {
+    func seek(to time: CueTime) {
         playbackQueue.sync {
             self.renderer.flush()
             current!.1.seek(to: CMTime(from: time))

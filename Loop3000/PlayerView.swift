@@ -2,13 +2,13 @@ import SwiftUI
 import Combine
 
 struct PlayerView: View {
-    @EnvironmentObject private var model: ViewModel
+    @EnvironmentObject private var model: AppModel
 
     @State private var sliderValue = 0.0
     @State private var duration = Int.max
     @State private var editing = false
-    private var targetTimestamp: Timestamp {
-        Timestamp(value: Int(Double(duration) * sliderValue))
+    private var targetTimestamp: CueTime {
+        CueTime(value: Int(Double(duration) * sliderValue))
     }
 
     var body: some View {
@@ -42,7 +42,7 @@ struct PlayerView: View {
             }
             .font(.title2)
             .buttonStyle(.borderless)
-            Text(editing ? targetTimestamp.briefDescription : model.currentTimestamp.briefDescription)
+            Text(editing ? targetTimestamp.shortDescription : model.currentTimestamp.shortDescription)
                 .padding([.leading, .trailing], 5)
                 .font(.body.monospacedDigit())
             Slider(value: $sliderValue, in: 0 ... 1, onEditingChanged: { editing = $0 })
@@ -54,8 +54,8 @@ struct PlayerView: View {
                     updateDuration(playingItem)
                     updateTimestamp(model.currentTimestamp)
                 }
-                .onChange(of: model.currentTimestamp) { timestamp in
-                    updateTimestamp(timestamp)
+                .onReceive(model.refreshTimer) { _ in
+                    updateTimestamp(model.currentTimestamp)
                 }
                 .onChange(of: editing) { editing in
                     if !editing {
@@ -73,12 +73,12 @@ struct PlayerView: View {
     private func updateDuration(_ itemId: UUID?) {
         if let track = itemId
             .flatMap({ model.musicLibrary.locatePlaylistItem(by: $0)?.1 })
-            .map({ model.musicLibrary.getTrack(by: $0.trackId) }) {
+            .flatMap({ model.musicLibrary.getTrack(by: $0.trackId) }) {
             duration = track.end.value - track.start.value
         }
     }
 
-    private func updateTimestamp(_ timestamp: Timestamp) {
+    private func updateTimestamp(_ timestamp: CueTime) {
         guard !editing else { return }
         sliderValue = Double(timestamp.value) / Double(duration)
     }

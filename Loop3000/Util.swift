@@ -1,5 +1,7 @@
 import Foundation
 import Combine
+import UniformTypeIdentifiers
+import Collections
 
 func stringEncoding(for data: Data) -> String.Encoding? {
     let encodingValue = NSString.stringEncoding(for: data, convertedString: nil, usedLossyConversion: nil)
@@ -57,15 +59,11 @@ extension UUID: Comparable {
     }
 }
 
-protocol Unicorn: Identifiable, Hashable {}
+protocol EquatableIdentifiable: Identifiable, Equatable {}
 
-extension Unicorn {
+extension EquatableIdentifiable {
     static func == (lhs: Self, rhs: Self) -> Bool {
         return lhs.id == rhs.id
-    }
-
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(self.id)
     }
 }
 
@@ -75,14 +73,14 @@ extension Array where Element: Identifiable {
     }
 }
 
-extension Array where Element: Hashable {
+extension Array where Element: Identifiable {
     func dropDuplicates() -> Self {
         var r: Self = []
-        var s: Set<Element> = []
+        var s: Set<Element.ID> = []
         for elem in self {
-            if s.contains(elem) { continue }
+            if s.contains(elem.id) { continue }
             r.append(elem)
-            s.insert(elem)
+            s.insert(elem.id)
         }
         return r
     }
@@ -97,18 +95,27 @@ extension URL {
     func replacingPathExtension(_ pathExtension: String) -> Self {
         deletingPathExtension().appendingPathExtension(pathExtension)
     }
-}
 
-extension Publisher {
-    func `await`<T>(_ f: @escaping (Output) async -> T) -> some Publisher<T, Failure> {
-        flatMap { value -> Future<T, Failure> in
-            Future { promise in
-                Task {
-                    let result = await f(value)
-                    promise(.success(result))
-                }
-            }
-        }
+    var pathDescription: String {
+        isFileURL ? path : description
+    }
+
+    var isDirectory: Bool? {
+        try? resourceValues(forKeys: [.isDirectoryKey]).isDirectory
+    }
+
+    var type: UTType? {
+        UTType(filenameExtension: pathExtension)
+    }
+
+    func conforms(to type: UTType) -> Bool {
+        guard let thisType = self.type else { return false }
+        return thisType.conforms(to: type)
+    }
+
+    func conformsAny(to types: [UTType]) -> Bool {
+        guard let thisType = self.type else { return false }
+        return types.contains { thisType.conforms(to: $0) }
     }
 }
 
@@ -118,35 +125,30 @@ extension Publisher {
             .compactMap { $0 }
     }
 
-    func withPrevious(_ initialPreviousValue: Output) -> some Publisher<(previous: Output, current: Output), Failure> {
-        scan((initialPreviousValue, initialPreviousValue)) { ($0.1, $1) }
+    func receiveOnMain() -> some Publisher<Output, Failure> {
+        receive(on: RunLoop.main)
     }
 }
 
-actor AsyncQueue {
-    func perform(_ operation: () async -> ()) async {
-        await operation()
-    }
+protocol FileError: Error, CustomStringConvertible {
+    var url: URL { get }
+    static var prompt: String { get }
 }
 
-struct InvalidFormat: Error, CustomStringConvertible {
-    let url: URL
-    private var pathDescription: String {
-        url.isFileURL ? url.path : url.description
-    }
+extension FileError {
     var description: String {
-        "Invalid format: '\(pathDescription)'"
+        "\(Self.prompt): \(url.pathDescription)"
     }
 }
 
-struct FileNotFound: Error, CustomStringConvertible {
+struct InvalidFormat: FileError {
     let url: URL
-    private var pathDescription: String {
-        url.isFileURL ? url.path : url.description
-    }
-    var description: String {
-        "File not found: '\(pathDescription)'"
-    }
+    static let prompt = "Invalid format"
+}
+
+struct FileNotFound: FileError {
+    let url: URL
+    static let prompt = "File not found"
 }
 
 func makeMonotonicUUID() -> UUID {
@@ -169,4 +171,43 @@ func universalSplit(_ s: String) -> [String] {
         .components(separatedBy: universalSeparators)
         .map { $0.trimmingCharacters(in: .whitespaces) }
         .filter { !$0.isEmpty }
+}
+
+struct BookmarkDataDecodingError: Error {}
+
+func dumpURLToBookmark(_ url: URL) throws -> Data {
+    return try url.bookmarkData(options: [.withSecurityScope, .securityScopeAllowOnlyReadAccess])
+}
+
+func loadURLFromBookmark(_ bookmark: Data) throws -> URL {
+    var isStale = false
+    let url = try URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, bookmarkDataIsStale: &isStale)
+    guard !isStale && url.startAccessingSecurityScopedResource() else {
+        throw BookmarkDataDecodingError()
+    }
+    return url
+}
+
+actor SerialAsyncQueue {
+    private var processing = false
+    private var queue = Deque<() async -> ()>()
+
+    func process() async {
+        processing = true
+        while let operation = queue.popFirst() {
+            let _ = await Task.detached {
+                await operation()
+            }.result
+        }
+        processing = false
+    }
+
+    func enqueue(_ operation: @Sendable @escaping () async -> ()) {
+        queue.append(operation)
+        if !processing {
+            Task {
+                await process()
+            }
+        }
+    }
 }

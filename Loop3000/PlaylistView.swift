@@ -1,7 +1,7 @@
 import SwiftUI
 import CoreGraphics
 
-fileprivate struct PlaylistViewItem: Unicorn {
+fileprivate struct PlaylistViewItem: EquatableIdentifiable {
     let id: UUID
     let track: Track
     let album: Album
@@ -9,7 +9,7 @@ fileprivate struct PlaylistViewItem: Unicorn {
     let playlist: Playlist?
 
     var title: String? {
-        track.metadata[MetadataCommonKey.title]
+        track.metadata[\.title]
     }
 
     var uiTitle: String {
@@ -17,8 +17,8 @@ fileprivate struct PlaylistViewItem: Unicorn {
     }
 
     var artists: [String] {
-        let artistsString = track.metadata[MetadataCommonKey.artist]
-            ?? album.metadata[MetadataCommonKey.artist]
+        let artistsString = track.metadata[\.artist]
+            ?? album.metadata[\.artist]
             ?? ""
         switch artistsString {
         case "Various Artists": fallthrough
@@ -32,11 +32,11 @@ fileprivate struct PlaylistViewItem: Unicorn {
     }
 
     var trackNumber: Int? {
-        track.metadata[MetadataCommonKey.trackNumber].flatMap { Int($0) }
+        track.metadata[\.trackNumber].flatMap { Int($0) }
     }
 
     var discNumber: Int? {
-        track.metadata[MetadataCommonKey.discNumber].flatMap { Int($0) }
+        track.metadata[\.discNumber].flatMap { Int($0) }
     }
 
     var indexString: String? {
@@ -49,11 +49,11 @@ fileprivate struct PlaylistViewItem: Unicorn {
     }
 
     var albumTitle: String? {
-        album.metadata[MetadataCommonKey.title]
+        album.metadata[\.title]
     }
 
     var albumArtists: [String] {
-        let artistsString = album.metadata[MetadataCommonKey.artist] ?? ""
+        let artistsString = album.metadata[\.artist] ?? ""
         switch artistsString {
         case "Various Artists": fallthrough
         case "V.A.": fallthrough
@@ -83,9 +83,7 @@ fileprivate struct PlaylistViewItem: Unicorn {
     }
 
     var duration: String? {
-        let durationValue = track.end.value - track.start.value
-        guard durationValue >= 0 else { return nil }
-        return Timestamp(value: track.end.value - track.start.value).briefDescription
+        return CueTime.difference(track.end, track.start)?.shortDescription
     }
 
     init(track: Track, album: Album, playlistItem: PlaylistItem?, playlist: Playlist?) {
@@ -98,7 +96,7 @@ fileprivate struct PlaylistViewItem: Unicorn {
 }
 
 fileprivate struct PlaylistItemView: View {
-    @EnvironmentObject private var model: ViewModel
+    @EnvironmentObject private var model: AppModel
 
     @State private var lastTap = DispatchTime.init(uptimeNanoseconds: 0)
 
@@ -160,7 +158,7 @@ fileprivate struct PlaylistItemView: View {
 }
 
 struct PlaylistView: View {
-    @EnvironmentObject private var model: ViewModel
+    @EnvironmentObject private var model: AppModel
 
     private struct SectionItem: Identifiable {
         let id: UUID
@@ -179,15 +177,15 @@ struct PlaylistView: View {
     private var viewItems: [PlaylistViewItem] {
         if let playlist {
             return playlist.items.map {
-                let track = model.musicLibrary.getTrack(by: $0.trackId)
-                let album = model.musicLibrary.getAlbum(for: track)
+                let track = model.musicLibrary.getTrack(by: $0.trackId)!
+                let album = model.musicLibrary.getAlbum(by: track.albumId)!
                 return PlaylistViewItem(track: track, album: album, playlistItem: $0, playlist: playlist)
             }
         } else {
             return tracks!.map {
                 return PlaylistViewItem(
                     track: $0,
-                    album: model.musicLibrary.getAlbum(for: $0),
+                    album: model.musicLibrary.getAlbum(by: $0.albumId)!,
                     playlistItem: nil,
                     playlist: nil
                 )
@@ -212,8 +210,8 @@ struct PlaylistView: View {
         guard list == playlist else {
             return nil
         }
-        let track = model.musicLibrary.getTrack(by: item.trackId)
-        let album = model.musicLibrary.getAlbum(for: track)
+        let track = model.musicLibrary.getTrack(by: item.trackId)!
+        let album = model.musicLibrary.getAlbum(by: track.albumId)!
         return PlaylistViewItem(track: track, album: album, playlistItem: item, playlist: list)
     }
 
@@ -290,7 +288,7 @@ struct MetadataItemView: View {
 }
 
 struct MetadataView: View {
-    @EnvironmentObject private var model: ViewModel
+    @EnvironmentObject private var model: AppModel
 
     private let viewItem: PlaylistViewItem
     private var coverData: Data? {
@@ -318,6 +316,7 @@ struct MetadataView: View {
                     Image(coverImage, scale: 1, label: Text("Cover Artwork"))
                         .resizable()
                         .scaledToFit()
+                        .cornerRadius(2)
                         .shadow(radius: 1)
                 }
                 VStack(spacing: 5) {

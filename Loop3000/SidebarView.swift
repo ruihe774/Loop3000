@@ -10,15 +10,15 @@ fileprivate struct SidebarMaterial: NSViewRepresentable {
 }
 
 struct Sidebar: View {
-    @EnvironmentObject private var model: ViewModel
+    @EnvironmentObject private var model: AppModel
 
     @State private var filterString = ""
 
     private enum ListType {
-        case Albums
-        case Playlists
+        case albums
+        case playlists
     }
-    @State private var listType = ListType.Albums
+    @State private var listType = ListType.albums
 
     var body: some View {
         VStack {
@@ -40,20 +40,20 @@ struct Sidebar: View {
                 .disabled(true)
             HStack(spacing: 15) {
                 Button {
-                    listType = .Albums
+                    listType = .albums
                 } label: {
-                    Label("Albums", systemImage: listType == .Albums ? "opticaldisc.fill" : "opticaldisc")
+                    Label("Albums", systemImage: listType == .albums ? "opticaldisc.fill" : "opticaldisc")
                         .labelStyle(.iconOnly)
                 }
-                .foregroundColor(listType == .Albums ? .accentColor : .secondary)
+                .foregroundColor(listType == .albums ? .accentColor : .secondary)
                 .buttonStyle(.borderless)
                 Button {
-                    listType = .Playlists
+                    listType = .playlists
                 } label: {
                     Label("Playlists", systemImage: "music.note.list")
                         .labelStyle(.iconOnly)
                 }
-                .foregroundColor(listType == .Playlists ? .accentColor : .secondary)
+                .foregroundColor(listType == .playlists ? .accentColor : .secondary)
                 .buttonStyle(.borderless)
                 .disabled(true)
             }
@@ -61,19 +61,18 @@ struct Sidebar: View {
             ScrollView {
                 LazyVStack(spacing: -4) {
                     ForEach(
-                        listType == .Albums ? model.musicLibrary.albumPlaylists : model.musicLibrary.manualPlaylists
+                        listType == .albums ? model.musicLibrary.albumPlaylists : model.musicLibrary.manualPlaylists
                     ) { playlist in
                         let selected = model.selectedList == playlist.id
                         Button {
                             model.selectedList = playlist.id
                         } label: {
-                            HStack {
+                            ScrollView(.horizontal) {
                                 Text(playlist.title)
                                     .help(playlist.title)
                                     .foregroundColor(.primary)
-                                    .scaledToFit()
-                                Spacer()
                             }
+                            .scrollIndicators(.never)
                             .padding(6)
                         }
                         .buttonStyle(.borderless)
@@ -91,7 +90,7 @@ struct Sidebar: View {
         .background(SidebarMaterial())
         .onAppear {
             guard let selectedList = model.selectedList else { return }
-            listType = model.musicLibrary.albumPlaylists.contains(where: { $0.id == selectedList }) ? .Albums : .Playlists
+            listType = model.musicLibrary.albumPlaylists.contains(where: { $0.id == selectedList }) ? .albums : .playlists
         }
     }
 }

@@ -10,18 +10,17 @@ struct Stub: View {
 }
 
 struct MainView: View {
-    @EnvironmentObject private var model: ViewModel
+    @EnvironmentObject private var model: AppModel
 
     var body: some View {
-        if model.windowIsHidden {
+        if model.applicationIsHidden {
             Spacer()
         } else {
             HStack(spacing: 0) {
                 Sidebar()
                 ZStack {
                     Rectangle()
-                        .background(Color(nsColor: .windowBackgroundColor))
-                        .foregroundColor(.clear)
+                        .fill(Color(nsColor: .windowBackgroundColor))
                         .shadow(radius: 1)
                     VStack(spacing: 0) {
                         PlayerView()

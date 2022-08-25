@@ -3,25 +3,24 @@ import CoreGraphics
 import CoreImage
 import AVFoundation
 import UniformTypeIdentifiers
+import Collections
 
-struct Timestamp: Equatable {
-    private static let cueTimestampRegex = /(\d\d):(\d\d):(\d\d)/
-
+struct CueTime: Equatable {
     var value: Int
 
     static let timescale = 75
 
-    static let zero = Timestamp(value: 0)
-    static let invalid = Timestamp(valueUnchecked: -1)
-    static let indefinite = Timestamp(valueUnchecked: -2)
-    static let negativeInfinity = Timestamp(valueUnchecked: -3)
-    static let positiveInfinity = Timestamp(valueUnchecked: -4)
+    static let zero = CueTime(value: 0)
+    static let invalid = CueTime(valueUnchecked: -1)
+    static let indefinite = CueTime(valueUnchecked: -2)
+    static let negativeInfinity = CueTime(valueUnchecked: -3)
+    static let positiveInfinity = CueTime(valueUnchecked: -4)
 
     var isValid: Bool {
         value >= 0
     }
 
-    init() {
+    fileprivate init() {
         self = Self.invalid
     }
 
@@ -34,30 +33,18 @@ struct Timestamp: Equatable {
         self.value = valueUnchecked
     }
 
-    init(minutes: Int, seconds: Int, frames: Int) {
+    init?(minutes: Int, seconds: Int, frames: Int) {
+        guard minutes >= 0 && seconds >= 0 && frames >= 0 else { return nil }
+        guard frames < Self.timescale else { return nil }
+        guard seconds < 60 else { return nil }
         let totalSeconds = minutes * 60 + seconds
         let totalFrames = totalSeconds * Self.timescale + frames
         self.init(value: totalFrames)
     }
 
-    init?(fromCueTimestampString s: String) {
-        guard let match = try? Timestamp.cueTimestampRegex.wholeMatch(in: s) else { return nil }
+    init?(from s: String) {
+        guard let match = try? /(\d\d):(\d\d):(\d\d)/.wholeMatch(in: s) else { return nil }
         self.init(minutes: Int(match.1)!, seconds: Int(match.2)!, frames: Int(match.3)!)
-    }
-
-    init(from time: CMTime) {
-        switch time {
-        case .invalid:
-            self = Self.invalid
-        case .indefinite:
-            self = Self.indefinite
-        case .negativeInfinity:
-            self = Self.negativeInfinity
-        case .positiveInfinity:
-            self = Self.positiveInfinity
-        default:
-            self.init(value: Int(time.value) * Timestamp.timescale / Int(time.timescale))
-        }
     }
 
     var minutes: Int {
@@ -73,20 +60,37 @@ struct Timestamp: Equatable {
     }
 }
 
-extension Timestamp: CustomStringConvertible {
+extension CueTime: CustomStringConvertible {
     var description: String {
         String(format: "%02d:%02d:%02d", minutes, seconds, frames)
     }
 }
 
-extension Timestamp {
-    var briefDescription: String {
+extension CueTime {
+    var shortDescription: String {
         String(format: "%02d:%02d", minutes, seconds + (frames > Self.timescale / 2 ? 1 : 0))
     }
 }
 
+extension CueTime {
+    init(from time: CMTime) {
+        switch time {
+        case .invalid:
+            self = Self.invalid
+        case .indefinite:
+            self = Self.indefinite
+        case .negativeInfinity:
+            self = Self.negativeInfinity
+        case .positiveInfinity:
+            self = Self.positiveInfinity
+        default:
+            self.init(value: Int(time.value) * CueTime.timescale / Int(time.timescale))
+        }
+    }
+}
+
 extension CMTime {
-    init(from timestamp: Timestamp) {
+    init(from timestamp: CueTime) {
         switch timestamp {
         case .invalid:
             self = Self.invalid
@@ -97,12 +101,49 @@ extension CMTime {
         case .positiveInfinity:
             self = Self.positiveInfinity
         default:
-            self.init(value: CMTimeValue(timestamp.value), timescale: CMTimeScale(Timestamp.timescale))
+            self.init(value: CMTimeValue(timestamp.value), timescale: CMTimeScale(CueTime.timescale))
         }
     }
 }
 
-extension Timestamp: Codable {
+extension CueTime {
+    static func difference(_ lhs: CueTime, _ rhs: CueTime) -> CueTime? {
+        guard lhs.isValid && rhs.isValid else { return nil }
+        guard lhs >= rhs else { return nil }
+        return CueTime(value: lhs.value - rhs.value)
+    }
+
+    static func distance(_ lhs: CueTime, _ rhs: CueTime) -> CueTime? {
+        guard lhs.isValid && rhs.isValid else { return nil }
+        return CueTime(value: abs(lhs.value - rhs.value))
+    }
+}
+
+extension CueTime: Comparable {
+    static func <(lhs: CueTime, rhs: CueTime) -> Bool {
+        if lhs.isValid && rhs.isValid {
+            return lhs.value < rhs.value
+        } else {
+            switch (lhs, rhs) {
+            case (.invalid, _): fallthrough
+            case (_, .invalid): fallthrough
+            case (.indefinite, _): fallthrough
+            case (_, .indefinite):
+                fatalError("Non-comparable")
+            case (.negativeInfinity, .positiveInfinity):
+                return true
+            case (let l, .positiveInfinity) where l.isValid:
+                return true
+            case (.negativeInfinity, let r) where r.isValid:
+                return true
+            default:
+                return false
+            }
+        }
+    }
+}
+
+extension CueTime: Codable {
     func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(value)
@@ -115,146 +156,144 @@ extension Timestamp: Codable {
     }
 }
 
-typealias Metadata = [String: String]
-
 struct MetadataCommonKey {
-    static let title = "TITLE"
-    static let version = "VERSION"
-    static let album = "ALBUM"
-    static let trackNumber = "TRACKNUMBER"
-    static let discNumber = "DISCNUMBER"
-    static let artist = "ARTIST"
-    static let albumArtist = "ALBUMARTIST"
-    static let performer = "PERFORMER"
-    static let composer = "COMPOSER"
-    static let author = "AUTHOR"
-    static let contributor = "CONTRIBUTOR"
-    static let creator = "CREATOR"
-    static let publisher = "PUBLISHER"
-    static let copyright = "COPYRIGHT"
-    static let license = "LICENSE"
-    static let organization = "ORGANIZATION"
-    static let description = "DESCRIPTION"
-    static let genre = "GENRE"
-    static let date = "DATE"
-    static let language = "LANGUAGE"
-    static let location = "LOCATION"
-    static let ISRC = "ISRC"
-    static let comment = "COMMENT"
-    static let encoder = "ENCODER"
+    let title = "TITLE"
+    let version = "VERSION"
+    let album = "ALBUM"
+    let trackNumber = "TRACKNUMBER"
+    let discNumber = "DISCNUMBER"
+    let artist = "ARTIST"
+    let albumArtist = "ALBUMARTIST"
+    let performer = "PERFORMER"
+    let composer = "COMPOSER"
+    let author = "AUTHOR"
+    let contributor = "CONTRIBUTOR"
+    let creator = "CREATOR"
+    let publisher = "PUBLISHER"
+    let copyright = "COPYRIGHT"
+    let license = "LICENSE"
+    let organization = "ORGANIZATION"
+    let description = "DESCRIPTION"
+    let genre = "GENRE"
+    let date = "DATE"
+    let language = "LANGUAGE"
+    let location = "LOCATION"
+    let ISRC = "ISRC"
+    let comment = "COMMENT"
+    let encoder = "ENCODER"
 }
 
-class Album: Unicorn, Codable {
+fileprivate let metadataCommonKey = MetadataCommonKey()
+
+struct Metadata {
+    private var metadata: [String: String] = [:]
+
+    subscript(key: String) -> String? {
+        get {
+            metadata[key]
+        }
+        set(newValue) {
+            metadata[key] = newValue
+        }
+    }
+
+    subscript(key: KeyPath<MetadataCommonKey, String>) -> String? {
+        get {
+            metadata[metadataCommonKey[keyPath: key]]
+        }
+        set(newValue) {
+            metadata[metadataCommonKey[keyPath: key]] = newValue
+        }
+    }
+}
+
+extension Metadata: Sequence {
+    typealias Element = (key: String, value: String)
+    typealias Iterator = Dictionary<String, String>.Iterator
+    func makeIterator() -> Iterator {
+        metadata.makeIterator()
+    }
+}
+
+extension Metadata {
+    mutating func merge(_ other: Metadata, uniquingKeysWith combine: (String, String) throws -> String) rethrows {
+        try metadata.merge(other.metadata, uniquingKeysWith: combine)
+    }
+}
+
+extension Metadata: Codable {
+    func encode(to encoder: Encoder) throws {
+        try metadata.encode(to: encoder)
+    }
+
+    init(from decoder: Decoder) throws {
+        metadata = try [String: String](from: decoder)
+    }
+}
+
+struct Album: EquatableIdentifiable, Codable {
     private(set) var id = makeMonotonicUUID()
     var metadata = Metadata()
     var cover: Data?
 }
 
-class Track: Unicorn, Codable {
+struct Track: EquatableIdentifiable, Codable {
     private(set) var id = UUID()
     var source: URL
-    private var bookmark: Data?
-    var start: Timestamp
-    var end: Timestamp
+    var start: CueTime
+    var end: CueTime
     var albumId: UUID
     var metadata = Metadata()
-
-    init(source: URL, start: Timestamp, end: Timestamp, albumId: UUID) {
-        self.source = source
-        self.start = start
-        self.end = end
-        self.albumId = albumId
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case id
-        case source
-        case start
-        case end
-        case albumId
-        case metadata
-    }
-
-    private struct BookmarkDataDecodingError: Error {}
-
-    private struct URLBookmarkPair: Codable {
-        let url: URL
-        let bookmark: Data?
-    }
-
-    private static func dumpURL(_ url: URL) throws -> Data {
-        return try url.bookmarkData(options: [.withSecurityScope, .securityScopeAllowOnlyReadAccess])
-    }
-
-    private static func loadURL(_ data: Data) throws -> URL {
-        var isStale = false
-        let url = try URL(resolvingBookmarkData: data, options: .withSecurityScope, bookmarkDataIsStale: &isStale)
-        guard !isStale && url.startAccessingSecurityScopedResource() else {
-            throw BookmarkDataDecodingError()
-        }
-        return url
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(id, forKey: .id)
-        try container.encode(URLBookmarkPair(url: source, bookmark: (try? Self.dumpURL(source)) ?? bookmark), forKey: .source)
-        try container.encode(start, forKey: .start)
-        try container.encode(end, forKey: .end)
-        try container.encode(albumId, forKey: .albumId)
-        try container.encode(metadata, forKey: .metadata)
-    }
-
-    required init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(UUID.self, forKey: .id)
-        let pair = try container.decode(URLBookmarkPair.self, forKey: .source)
-        source = pair.bookmark.flatMap({ try? Self.loadURL($0) }) ?? pair.url
-        bookmark = pair.bookmark
-        start = try container.decode(Timestamp.self, forKey: .start)
-        end = try container.decode(Timestamp.self, forKey: .end)
-        albumId = try container.decode(UUID.self, forKey: .albumId)
-        metadata = try container.decode(Metadata.self, forKey: .metadata)
-    }
 }
 
-class PlaylistItem: Unicorn, Codable {
-    private(set) var id: UUID
+struct PlaylistItem: EquatableIdentifiable, Codable {
+    private(set) var id = UUID()
     var trackId: UUID
-
-    init(id: UUID = UUID(), trackId: UUID) {
-        self.id = id
-        self.trackId = trackId
-    }
 }
 
-class Playlist: Unicorn, Codable {
-    private(set) var id: UUID
+struct Playlist: EquatableIdentifiable, Codable {
+    private(set) var id = UUID()
     var title: String
     var items: [PlaylistItem]
+}
 
-    init(id: UUID = UUID(), title: String, items: [PlaylistItem]) {
-        self.id = id
-        self.title = title
-        self.items = items
+struct DiscoverLogItem: Codable {
+    enum Action: Hashable, Codable {
+        case discovering
+        case importing
+        case grabbing
     }
+    let action: Action
+    let url: URL
+    let bookmark: Data
+    let date: Date
+}
+
+struct DiscoverLog: Codable {
+    var items: [DiscoverLogItem]
+    static let empty = DiscoverLog(items: [])
 }
 
 struct Shelf: Codable {
     var albums: [Album] = []
     var tracks: [Track] = []
     var manualPlaylists: [Playlist] = []
+    var discoverLog = DiscoverLog.empty
 
     func getTracks(for album: Album) -> [Track] {
         tracks.filter { $0.albumId == album.id }
     }
 
-    func getTracks(for playlist: Playlist) -> [Track] {
-        playlist.items.map { tracks.get(by: $0.trackId)! }
-    }
-
     func getAlbum(for track: Track) -> Album {
         albums.get(by: track.albumId)!
+    }
+
+    fileprivate mutating func modifyTracks(for album: Album, transform: (Track) -> Track) {
+        for (i, track) in tracks.enumerated() {
+            if track.albumId == album.id {
+                tracks[i] = transform(track)
+            }
+        }
     }
 
     func sorted(tracks: [Track]) -> [Track] {
@@ -262,8 +301,8 @@ struct Shelf: Codable {
             if $0.albumId != $1.albumId {
                 let albumL = getAlbum(for: $0)
                 let albumR = getAlbum(for: $1)
-                let albumTitleL = albumL.metadata[MetadataCommonKey.title]
-                let albumTitleR = albumR.metadata[MetadataCommonKey.title]
+                let albumTitleL = albumL.metadata[\.title]
+                let albumTitleR = albumR.metadata[\.title]
                 if albumTitleL != albumTitleR {
                     if albumTitleL == nil { return false }
                     if albumTitleR == nil { return true }
@@ -271,15 +310,15 @@ struct Shelf: Codable {
                 }
                 return $0.albumId < $1.albumId
             }
-            let discNumberL = $0.metadata[MetadataCommonKey.discNumber].flatMap { Int($0) }
-            let discNumberR = $1.metadata[MetadataCommonKey.discNumber].flatMap { Int($0) }
+            let discNumberL = $0.metadata[\.discNumber].flatMap { Int($0) }
+            let discNumberR = $1.metadata[\.discNumber].flatMap { Int($0) }
             if discNumberL != discNumberR {
                 if discNumberL == nil { return false }
                 if discNumberR == nil { return true }
                 return discNumberL! < discNumberR!
             }
-            let trackNumberL = $0.metadata[MetadataCommonKey.trackNumber].flatMap { Int($0) }
-            let trackNumberR = $1.metadata[MetadataCommonKey.trackNumber].flatMap { Int($0) }
+            let trackNumberL = $0.metadata[\.trackNumber].flatMap { Int($0) }
+            let trackNumberR = $1.metadata[\.trackNumber].flatMap { Int($0) }
             if trackNumberL != trackNumberR {
                 if trackNumberL == nil { return false }
                 if trackNumberR == nil { return true }
@@ -288,14 +327,14 @@ struct Shelf: Codable {
             if $0.source.absoluteString != $1.source.absoluteString {
                 return $0.source.absoluteString < $1.source.absoluteString
             }
-            return $0.start.value < $1.start.value
+            return $0.start < $1.start
         }
     }
 
     func sorted(albums: [Album]) -> [Album] {
         albums.sorted { (albumL, albumR) in
-            let albumTitleL = albumL.metadata[MetadataCommonKey.title]
-            let albumTitleR = albumR.metadata[MetadataCommonKey.title]
+            let albumTitleL = albumL.metadata[\.title]
+            let albumTitleR = albumR.metadata[\.title]
             if albumTitleL != albumTitleR {
                 if albumTitleL == nil { return false }
                 if albumTitleR == nil { return true }
@@ -305,16 +344,18 @@ struct Shelf: Codable {
         }
     }
 
-    func consolidateMetadata() {
-        for album in albums {
+    mutating func consolidateMetadata() {
+        for i in 0 ..< albums.count {
+            var album = albums[i]
             let tracks = getTracks(for: album)
             if tracks.count < 2 { continue }
+            var mergedKeys: [String] = []
             for (key, _) in tracks.first!.metadata {
                 switch key {
                 case
-                    MetadataCommonKey.trackNumber,
-                    MetadataCommonKey.discNumber,
-                    MetadataCommonKey.ISRC,
+                    metadataCommonKey.trackNumber,
+                    metadataCommonKey.discNumber,
+                    metadataCommonKey.ISRC,
                     "TOTALDISCS",
                     "TOTALTRACKS",
                     "DISCTOTAL",
@@ -326,23 +367,33 @@ struct Shelf: Codable {
                             album.metadata[key] = value
                         }
                         if album.metadata[key] == value {
-                            for track in tracks {
-                                track.metadata[key] = nil
-                            }
+                            mergedKeys.append(key)
                         }
                     }
+                }
+            }
+            albums[i] = album
+            if !mergedKeys.isEmpty {
+                modifyTracks(for: album) {
+                    var track = $0
+                    for key in mergedKeys {
+                        track.metadata[key] = nil
+                    }
+                    return track
                 }
             }
         }
     }
 
-    mutating func sort() {
-        albums = sorted(albums: albums)
-        tracks = sorted(tracks: tracks)
-    }
-
     mutating func merge(with other: Shelf) {
         self = mergeShelf(self, other)
+    }
+
+    func activate() {
+        for logItem in discoverLog.items {
+            guard let url = try? loadURLFromBookmark(logItem.bookmark) else { continue }
+            assert(url.absoluteURL == logItem.url.absoluteURL)
+        }
     }
 }
 
@@ -361,113 +412,183 @@ protocol MetadataGrabber: AnyObject {
     func grabMetadata(url: URL, tracer: RequestTracer?) async throws -> Metadata
 }
 
-var mediaImporters: [any MediaImporter] = [CueSheetImporter(), AVImporter()]
-var metadataGrabbers: [any MetadataGrabber] = [FLACGrabber(), AVGrabber()]
+var mediaImporters: [any MediaImporter] = [CueSheetImporter(), AVAssetImporter()]
+var metadataGrabbers: [any MetadataGrabber] = [FLACGrabber(), AVAssetGrabber()]
 
 struct NoApplicableImporter: Error {
     let url: URL
 }
 
-func scanMedia(at url: URL, tracer: RequestTracer?) async throws -> (albums: [Album], tracks: [Track]) {
-    guard let type = UTType(filenameExtension: url.pathExtension) else {
-        throw NoApplicableImporter(url: url)
-    }
-    guard let importer = mediaImporters.first(where: { importer in
-        importer.supportedTypes.contains { type.conforms(to: $0) }
-    }) else {
-        throw NoApplicableImporter(url: url)
-    }
+struct DiscoverResult {
+    var albums: [Album]
+    var tracks: [Track]
+    var log: DiscoverLog
+    var errors: [Error]
+    static let empty = DiscoverResult(albums: [], tracks: [], log: .empty, errors: [])
 
-    let (albums, tracks) = try await importer.importMedia(url: url, tracer: tracer)
-
-    let sources = Set(tracks.map { $0.source })
-    let metadatas = try await withThrowingTaskGroup(of: (source: URL, metadata: Metadata).self) { taskGroup in
-        for source in sources {
-            guard let type = UTType(filenameExtension: source.pathExtension) else { continue }
-            guard let grabber = metadataGrabbers.first(where: { grabber in
-                grabber.supportedTypes.contains { type.conforms(to: $0) }
-            }) else { continue }
-            taskGroup.addTask {
-                (source: source, metadata: try await grabber.grabMetadata(url: source, tracer: tracer))
-            }
-        }
-        var metadatas = [URL: Metadata]()
-        for try await item in taskGroup {
-            metadatas[item.source] = item.metadata
-        }
-        return metadatas
+    mutating func merge(with other: Self) {
+        albums.append(contentsOf: other.albums)
+        tracks.append(contentsOf: other.tracks)
+        log.merge(with: other.log)
+        errors.append(contentsOf: other.errors)
     }
-    for track in tracks {
-        if let metadata = metadatas[track.source] {
-            track.metadata.merge(metadata) { (_, new) in new }
-        }
-    }
-
-    for track in tracks {
-        if let album = track.metadata[MetadataCommonKey.album] {
-            albums.get(by: track.albumId)!.metadata[MetadataCommonKey.title] = album
-            track.metadata[MetadataCommonKey.album] = nil
-        }
-        if let albumArtist = track.metadata[MetadataCommonKey.albumArtist] {
-            albums.get(by: track.albumId)!.metadata[MetadataCommonKey.artist] = albumArtist
-            track.metadata[MetadataCommonKey.albumArtist] = nil
-        }
-    }
-
-    return (albums: albums, tracks: tracks)
 }
 
-func discoverMedia(at url: URL, recursive: Bool = false, tracer: RequestTracer?)
-async throws -> (albums: [Album], tracks: [Track], errors: [Error]) {
-    var r = (albums: [Album](), tracks: [Track](), errors: [Error]())
-    let fileManager = FileManager.default
-    var children = Set(try fileManager.contentsOfDirectory(
-        at: url, includingPropertiesForKeys: [.isDirectoryKey], options: .skipsHiddenFiles
-    ).map { $0.absoluteURL })
-    for importer in mediaImporters {
-        let applicableFiles = children.filter { url in
-            guard let type = UTType(filenameExtension: url.pathExtension) else { return false }
-            return importer.supportedTypes.contains { type.conforms(to: $0) }
+fileprivate extension DiscoverLog {
+    func needsRediscover(action: DiscoverLogItem.Action, url: URL) -> Bool {
+        guard let logItem = items.first(where: { $0.url.absoluteURL == url.absoluteURL }) else {
+            return true
         }
-        await withTaskGroup(of: (albums: [Album], tracks: [Track], errors: [Error]).self) { taskGroup in
-            for url in applicableFiles {
-                taskGroup.addTask {
-                    var rv = (albums: [Album](), tracks: [Track](), errors: [Error]())
-                    do {
-                        let (albums, tracks) = try await scanMedia(at: url, tracer: tracer)
-                        rv.albums = albums
-                        rv.tracks = tracks
-                    } catch let error {
-                        rv.errors = [error]
+        guard let mtime = try? url.resourceValues(
+            forKeys: [.contentModificationDateKey]
+        ).contentModificationDate else {
+            return true
+        }
+        return mtime > logItem.date
+    }
+
+    mutating func log(action: DiscoverLogItem.Action, url: URL) {
+        items.append(DiscoverLogItem(action: action, url: url, bookmark: try! dumpURLToBookmark(url), date: Date.now))
+    }
+
+    mutating func merge(with other: Self) {
+        struct Key: Hashable {
+            var action: DiscoverLogItem.Action
+            var url: URL
+        }
+        var pool = OrderedDictionary<Key, DiscoverLogItem>()
+        for item in items + other.items {
+            let key = Key(action: item.action, url: item.url.absoluteURL)
+            if let oitem = pool[key] {
+                if item.date < oitem.date {
+                    continue
+                }
+            }
+            pool[key] = item
+        }
+        items = pool.values.elements
+    }
+}
+
+func discover(
+    at url: URL,
+    recursive: Bool = false,
+    previousLog: DiscoverLog = .empty,
+    tracer: RequestTracer?
+) async -> DiscoverResult {
+    var r = DiscoverResult.empty
+    if url.isDirectory == true {
+        r.log.log(action: .discovering, url: url)
+        let fileManager = FileManager.default
+        var children = Set(((try? fileManager.contentsOfDirectory(
+            at: url, includingPropertiesForKeys: [.isDirectoryKey, .contentModificationDateKey], options: .skipsHiddenFiles
+        )) ?? []).map { $0.absoluteURL })
+        for importer in mediaImporters {
+            let applicableFiles = children.filter { $0.conformsAny(to: importer.supportedTypes) }
+            await withTaskGroup(of: DiscoverResult.self) { taskGroup in
+                for url in applicableFiles {
+                    taskGroup.addTask {
+                        await discover(at: url, recursive: false, previousLog: previousLog, tracer: tracer)
                     }
-                    return rv
+                }
+                for await rv in taskGroup {
+                    r.merge(with: rv)
+                }
+            }
+            children.subtract(applicableFiles)
+            children.subtract(r.tracks.map { $0.source.absoluteURL })
+        }
+        if recursive {
+            await withTaskGroup(of: DiscoverResult.self) { taskGroup in
+                for child in children {
+                    if child.isDirectory == true {
+                        taskGroup.addTask {
+                            await discover(at: child, recursive: true, previousLog: previousLog, tracer: tracer)
+                        }
+                    }
+                }
+                for await rv in taskGroup {
+                    r.merge(with: rv)
+                }
+            }
+        }
+    } else {
+        guard let importer = mediaImporters.first(where: {
+            url.conformsAny(to: $0.supportedTypes)
+        }) else {
+            r.errors.append(NoApplicableImporter(url: url))
+            return r
+        }
+        if !previousLog.needsRediscover(action: .importing, url: url) {
+            return r
+        } else {
+            r.log.log(action: .importing, url: url)
+        }
+        var albums: [Album] = []
+        var tracks: [Track] = []
+        do {
+            (albums, tracks) = try await importer.importMedia(url: url, tracer: tracer)
+        } catch let error {
+            r.errors.append(error)
+            return r
+        }
+        let sources = Set(tracks.map { $0.source.absoluteURL })
+        var metadatas = [URL: Metadata]()
+        await withTaskGroup(of: (source: URL, metadata: Metadata?, error: Error?).self) { taskGroup in
+            for source in sources {
+                guard let grabber = metadataGrabbers.first(where: {
+                    source.conformsAny(to: $0.supportedTypes)
+                }) else { continue }
+                if !previousLog.needsRediscover(action: .grabbing, url: source) {
+                    continue
+                } else {
+                    r.log.log(action: .grabbing, url: source)
+                }
+                taskGroup.addTask {
+                    do {
+                        return (source: source, metadata: try await grabber.grabMetadata(url: source, tracer: tracer), error: nil)
+                    } catch let error {
+                        return (source: source, metadata: nil, error: error)
+                    }
                 }
             }
             for await item in taskGroup {
-                r.albums.append(contentsOf: item.albums)
-                r.tracks.append(contentsOf: item.tracks)
-                r.errors.append(contentsOf: item.errors)
+                if let metadata = item.metadata {
+                    metadatas[item.source] = metadata
+                }
+                if let error = item.error {
+                    r.errors.append(error)
+                }
             }
         }
-        children.subtract(applicableFiles)
-        children.subtract(r.tracks.map { $0.source.absoluteURL })
-    }
-    if recursive {
-        try await withThrowingTaskGroup(of: (albums: [Album], tracks: [Track], errors: [Error]).self) { taskGroup in
-            for child in children {
-                let isDirectory = try child.resourceValues(forKeys: [.isDirectoryKey]).isDirectory ?? false
-                if isDirectory {
-                    taskGroup.addTask {
-                        try await discoverMedia(at: child, recursive: true, tracer: tracer)
+        tracks = tracks.map {
+            var track = $0
+            if let metadata = metadatas[track.source] {
+                track.metadata.merge(metadata) { (_, new) in new }
+            }
+            let albumTitle = track.metadata[\.album]
+            let albumArtist = track.metadata[\.albumArtist]
+            if albumTitle != nil || albumArtist != nil {
+                for i in 0 ..< albums.count {
+                    var album = albums[i]
+                    if album.id == track.albumId {
+                        if let albumTitle {
+                            album.metadata[\.title] = albumTitle
+                        }
+                        if let albumArtist {
+                            album.metadata[\.artist] = albumArtist
+                        }
+                        albums[i] = album
+                        break
                     }
                 }
             }
-            for try await item in taskGroup {
-                r.albums.append(contentsOf: item.albums)
-                r.tracks.append(contentsOf: item.tracks)
-                r.errors.append(contentsOf: item.errors)
-            }
+            track.metadata[\.album] = nil
+            track.metadata[\.albumArtist] = nil
+            return track
         }
+        r.albums = albums
+        r.tracks = tracks
     }
     return r
 }
@@ -476,7 +597,7 @@ fileprivate func mergeShelf(_ a: Shelf, _ b: Shelf) -> Shelf {
     var mergedShelf = Shelf()
 
     var trackIdMap: [UUID: UUID] = [:]
-    var unconsolidatedTracks = (a.tracks + b.tracks).dropDuplicates()
+    var unconsolidatedTracks = a.tracks + b.tracks
     unconsolidatedTracks.reverse()
     var consolidatedTracks: [Track] = []
     while var track = unconsolidatedTracks.popLast() {
@@ -496,17 +617,25 @@ fileprivate func mergeShelf(_ a: Shelf, _ b: Shelf) -> Shelf {
     for track in consolidatedTracks {
         usedAlbumIds.insert(track.albumId)
     }
-    var unconsolidatedAlbums = (a.albums + b.albums).dropDuplicates().filter { usedAlbumIds.contains($0.id) }
+    var unconsolidatedAlbums = (a.albums + b.albums).filter { usedAlbumIds.contains($0.id) }
     unconsolidatedAlbums.reverse()
     var consolidatedAlbums: [Album] = []
     while var album = unconsolidatedAlbums.popLast() {
-        unconsolidatedAlbums = unconsolidatedAlbums.compactMap {
+        unconsolidatedAlbums = unconsolidatedAlbums.compactMap { otherAlbum in
             guard let mergedAlbum = mergeAlbums(
                 album,
                 mergedShelf.getTracks(for: album),
-                $0,
-                mergedShelf.getTracks(for: $0)
-            ) else { return $0 }
+                otherAlbum,
+                mergedShelf.getTracks(for: otherAlbum)
+            ) else { return otherAlbum }
+            mergedShelf.tracks = mergedShelf.tracks
+                .map {
+                    var track = $0
+                    if track.albumId == album.id || track.albumId == otherAlbum.id {
+                        track.albumId = mergedAlbum.id
+                    }
+                    return track
+                }
             album = mergedAlbum
             return nil
         }
@@ -514,13 +643,20 @@ fileprivate func mergeShelf(_ a: Shelf, _ b: Shelf) -> Shelf {
     }
     mergedShelf.albums = consolidatedAlbums
 
-    let consolidatedPlaylists = (a.manualPlaylists + b.manualPlaylists).dropDuplicates()
-    for playlist in consolidatedPlaylists {
-        for item in playlist.items {
+    let unconsolidatedPlaylists = a.manualPlaylists + b.manualPlaylists
+    let consolidatedPlaylists = unconsolidatedPlaylists.map {
+        var playlist = $0
+        playlist.items = playlist.items.map {
+            var item = $0
             item.trackId = trackIdMap[item.trackId]!
+            return item
         }
+        return playlist
     }
     mergedShelf.manualPlaylists = consolidatedPlaylists
+
+    mergedShelf.discoverLog = a.discoverLog
+    mergedShelf.discoverLog.merge(with: b.discoverLog)
 
     return mergedShelf
 }
@@ -531,32 +667,32 @@ fileprivate func mergeTracks(_ a: Track, _ b: Track) -> Track? {
     guard abs(a.end.value - b.end.value) < 500 || !a.end.isValid || !b.end.isValid else { return nil }
     let durationA = a.start.isValid && a.end.isValid ? a.end.value - a.start.value : .max
     let durationB = b.start.isValid && b.end.isValid ? b.end.value - b.start.value : .max
-    let selected = durationA == durationB ? (a.albumId < b.albumId ? a : b) : (durationA < durationB ? a : b)
+    var selected = durationA == durationB ? (a.albumId < b.albumId ? a : b) : (durationA < durationB ? a : b)
     let abandoned = selected.id == a.id ? b : a
     selected.metadata.merge(abandoned.metadata) { (cur, _) in cur }
     return selected
 }
 
 fileprivate func mergeAlbums(_ a: Album, _ tracksA: [Track], _ b: Album, _ tracksB: [Track]) -> Album? {
-    guard let titleA = a.metadata[MetadataCommonKey.title] else { return nil }
-    guard let titleB = b.metadata[MetadataCommonKey.title] else { return nil }
+    guard let titleA = a.metadata[\.title] else { return nil }
+    guard let titleB = b.metadata[\.title] else { return nil }
     guard titleA == titleB else { return nil }
-    var artistA = a.metadata[MetadataCommonKey.artist]
-    var artistB = b.metadata[MetadataCommonKey.artist]
+    var artistA = a.metadata[\.artist]
+    var artistB = b.metadata[\.artist]
     if artistA != nil && artistB == nil {
-        artistB = commonMetadata(tracksB, for: MetadataCommonKey.artist)
+        artistB = commonMetadata(tracksB, for: metadataCommonKey.artist)
     }
     if artistA == nil && artistB != nil {
-        artistA = commonMetadata(tracksA, for: MetadataCommonKey.artist)
+        artistA = commonMetadata(tracksA, for: metadataCommonKey.artist)
     }
     guard artistA == artistB else { return nil }
     for trackA in tracksA {
         if tracksB.contains(where: { trackB in
-            if let trackNumberA = trackA.metadata[MetadataCommonKey.trackNumber].flatMap({ Int($0) }),
-               let trackNumberB = trackB.metadata[MetadataCommonKey.trackNumber].flatMap({ Int($0) }) {
+            if let trackNumberA = trackA.metadata[\.trackNumber].flatMap({ Int($0) }),
+               let trackNumberB = trackB.metadata[\.trackNumber].flatMap({ Int($0) }) {
                 if trackNumberA == trackNumberB {
-                    if let discNumberA = trackA.metadata[MetadataCommonKey.discNumber].flatMap({ Int($0) }),
-                       let discNumberB = trackB.metadata[MetadataCommonKey.discNumber].flatMap({ Int($0) }) {
+                    if let discNumberA = trackA.metadata[\.discNumber].flatMap({ Int($0) }),
+                       let discNumberB = trackB.metadata[\.discNumber].flatMap({ Int($0) }) {
                         return discNumberA == discNumberB
                     } else {
                         return true
@@ -565,7 +701,7 @@ fileprivate func mergeAlbums(_ a: Album, _ tracksA: [Track], _ b: Album, _ track
                     return false
                 }
             }
-            if trackA.metadata[MetadataCommonKey.title] == trackB.metadata[MetadataCommonKey.title] {
+            if trackA.metadata[\.title] == trackB.metadata[\.title] {
                 return true
             }
             return false
@@ -573,13 +709,13 @@ fileprivate func mergeAlbums(_ a: Album, _ tracksA: [Track], _ b: Album, _ track
             return nil
         }
         if tracksB.contains(where: { trackB in
-            guard trackA.metadata[MetadataCommonKey.encoder] == trackB.metadata[MetadataCommonKey.encoder] else {
+            guard trackA.metadata[\.encoder] == trackB.metadata[\.encoder] else {
                 return true
             }
-            guard trackA.metadata[MetadataCommonKey.organization] == trackB.metadata[MetadataCommonKey.organization] else {
+            guard trackA.metadata[\.organization] == trackB.metadata[\.organization] else {
                 return true
             }
-            guard trackA.metadata[MetadataCommonKey.date] == trackB.metadata[MetadataCommonKey.date] else {
+            guard trackA.metadata[\.date] == trackB.metadata[\.date] else {
                 return true
             }
             guard trackA.metadata["YEAR"] == trackB.metadata["YEAR"] else {
@@ -590,12 +726,9 @@ fileprivate func mergeAlbums(_ a: Album, _ tracksA: [Track], _ b: Album, _ track
             return nil
         }
     }
-    let selected = a.id < b.id ? a : b
+    var selected = a.id < b.id ? a : b
     let abandoned = selected.id == a.id ? b : a
     selected.metadata.merge(abandoned.metadata) { (cur, _) in cur }
-    for track in tracksA + tracksB {
-        track.albumId = selected.id
-    }
     return selected
 }
 
@@ -653,7 +786,7 @@ fileprivate class CueSheetImporter: MediaImporter {
         var currentFile: URL?
         var currentTrack: Track?
         var tracks: [Track] = []
-        let album = Album()
+        var album = Album()
         var discNumber: Int?
         for line in content.split(whereSeparator: \.isNewline) {
             var parts: [Substring] = []
@@ -671,8 +804,8 @@ fileprivate class CueSheetImporter: MediaImporter {
                 if value.isEmpty {
                     return
                 }
-                if let track = currentTrack {
-                    track.metadata[key] = value
+                if currentTrack != nil {
+                    currentTrack!.metadata[key] = value
                 } else {
                     album.metadata[key] = value
                 }
@@ -704,41 +837,41 @@ fileprivate class CueSheetImporter: MediaImporter {
                 guard let file = currentFile,
                       let track = currentTrack,
                       let number = Int(params[0]),
-                      let timestamp = Timestamp(fromCueTimestampString: params[1])
+                      let timestamp = CueTime(from: params[1])
                 else {
                     throw InvalidFormat(url: url)
                 }
                 switch number {
                 case 0:
                     if let previousTrack = tracks.last, previousTrack.source == track.source {
-                        previousTrack.end = timestamp
+                        tracks[tracks.count - 1].end = timestamp
                     }
                 case 1:
-                    track.source = file
-                    track.start = timestamp
+                    currentTrack!.source = file
+                    currentTrack!.start = timestamp
                     if let previousTrack = tracks.last,
                        previousTrack.source == track.source && previousTrack.end == .invalid {
-                        previousTrack.end = timestamp
+                        tracks[tracks.count - 1].end = timestamp
                     }
                 default:
                     ()
                 }
             case ("SONGWRITER", 1):
-                setMetadata(for: MetadataCommonKey.composer)
+                setMetadata(for: metadataCommonKey.composer)
             case ("ISRC", 1):
-                setMetadata(for: MetadataCommonKey.ISRC)
+                setMetadata(for: metadataCommonKey.ISRC)
             case ("PERFORMER", 1):
-                setMetadata(for: MetadataCommonKey.artist)
+                setMetadata(for: metadataCommonKey.artist)
             case ("TITLE", 1):
-                setMetadata(for: MetadataCommonKey.title)
+                setMetadata(for: metadataCommonKey.title)
             case ("REM", 2):
                 switch params[0] {
                 case "DATE":
-                    setMetadata(params[1], for: MetadataCommonKey.date)
+                    setMetadata(params[1], for: metadataCommonKey.date)
                 case "COMPOSER":
-                    setMetadata(params[1], for: MetadataCommonKey.composer)
+                    setMetadata(params[1], for: metadataCommonKey.composer)
                 case "GENRE":
-                    setMetadata(params[1], for: MetadataCommonKey.genre)
+                    setMetadata(params[1], for: metadataCommonKey.genre)
                 case "DISCNUMBER":
                     discNumber = Int(params[1])
                 default:
@@ -752,36 +885,43 @@ fileprivate class CueSheetImporter: MediaImporter {
             tracks.append(previousTrack)
         }
         tracks = tracks.filter { $0.start != .invalid }
-        let tracksWithUnknownEnd = tracks.filter { $0.end == .invalid }
-        let sourcesNeedDuration = Set(tracksWithUnknownEnd.map { $0.source })
-        let durations = try await withThrowingTaskGroup(of: (url: URL, duration: Timestamp).self) { taskGroup in
+        let sourcesNeedDuration = Set(tracks
+            .filter { !$0.end.isValid }
+            .map { $0.source.absoluteURL }
+        )
+        let durations = try await withThrowingTaskGroup(of: (url: URL, duration: CueTime).self) { taskGroup in
             for source in sourcesNeedDuration {
                 taskGroup.addTask {
                     tracer?.add(url)
                     defer { tracer?.remove(url) }
                     let asset = AVAsset(url: source)
                     let duration = try await asset.load(.duration)
-                    return (url: source, duration: Timestamp(from: duration))
+                    return (url: source, duration: CueTime(from: duration))
                 }
             }
-            var durations: [URL: Timestamp] = [:]
+            var durations: [URL: CueTime] = [:]
             for try await item in taskGroup {
                 durations[item.url] = item.duration
             }
             return durations
         }
-        for track in tracksWithUnknownEnd {
-            track.end = durations[track.source]!
-        }
-        for (i, track) in tracks.enumerated() {
-            track.metadata[MetadataCommonKey.trackNumber] = String(i + 1)
-            track.metadata[MetadataCommonKey.discNumber] = discNumber.map { String($0) }
+        tracks = tracks
+            .map {
+                var track = $0
+                if !track.end.isValid {
+                    track.end = durations[track.source.absoluteURL]!
+                }
+                return track
+            }
+        for i in 0 ..< tracks.count {
+            tracks[i].metadata[\.trackNumber] = String(i + 1)
+            tracks[i].metadata[\.discNumber] = discNumber.map { String($0) }
         }
         return (albums: [album], tracks: tracks)
     }
 }
 
-fileprivate class AVImporter: MediaImporter {
+fileprivate class AVAssetImporter: MediaImporter {
     let supportedTypes = [UTType.audio]
 
     func importMedia(url: URL, tracer: RequestTracer?) async throws -> (albums: [Album], tracks: [Track]) {
@@ -790,7 +930,7 @@ fileprivate class AVImporter: MediaImporter {
         let asset = AVAsset(url: url)
         let duration = try await asset.load(.duration)
         let album = Album()
-        let track = Track(source: url, start: .zero, end: Timestamp(from: duration), albumId: album.id)
+        let track = Track(source: url, start: .zero, end: CueTime(from: duration), albumId: album.id)
         return (albums: [album], tracks: [track])
     }
 }
@@ -839,7 +979,7 @@ fileprivate class FLACGrabber: MetadataGrabber {
             case 4: // VORBIS_COMMENT
                 guard let vendorStringLength = reader.read(count: 4).map({ parse32bitIntLE($0) }) else { throw invalid }
                 guard let vendorString = reader.read(count: vendorStringLength) else { throw invalid }
-                metadata[MetadataCommonKey.encoder] = String(data: vendorString, encoding: .utf8)
+                metadata[\.encoder] = String(data: vendorString, encoding: .utf8)
                 guard let vectorLength = reader.read(count: 4).map({ parse32bitIntLE($0) }) else { throw invalid }
                 var totalReadCount = 8 + vendorStringLength
                 for _ in 0 ..< vectorLength {
@@ -864,21 +1004,21 @@ fileprivate class FLACGrabber: MetadataGrabber {
     }
 }
 
-fileprivate class AVGrabber: MetadataGrabber {
+fileprivate class AVAssetGrabber: MetadataGrabber {
     let supportedTypes = [UTType.audio]
 
     private static let keyMapping: [AVMetadataKey: String] = [
-        .commonKeyAlbumName: MetadataCommonKey.album,
-        .commonKeyArtist: MetadataCommonKey.artist,
-        .commonKeyAuthor: MetadataCommonKey.author,
-        .commonKeyContributor: MetadataCommonKey.contributor,
-        .commonKeyCopyrights: MetadataCommonKey.copyright,
-        .commonKeyCreator: MetadataCommonKey.creator,
-        .commonKeyTitle: MetadataCommonKey.title,
-        .commonKeyDescription: MetadataCommonKey.description,
-        .commonKeyLanguage: MetadataCommonKey.language,
-        .commonKeyLocation: MetadataCommonKey.location,
-        .commonKeyPublisher: MetadataCommonKey.publisher,
+        .commonKeyAlbumName: metadataCommonKey.album,
+        .commonKeyArtist: metadataCommonKey.artist,
+        .commonKeyAuthor: metadataCommonKey.author,
+        .commonKeyContributor: metadataCommonKey.contributor,
+        .commonKeyCopyrights: metadataCommonKey.copyright,
+        .commonKeyCreator: metadataCommonKey.creator,
+        .commonKeyTitle: metadataCommonKey.title,
+        .commonKeyDescription: metadataCommonKey.description,
+        .commonKeyLanguage: metadataCommonKey.language,
+        .commonKeyLocation: metadataCommonKey.location,
+        .commonKeyPublisher: metadataCommonKey.publisher,
     ]
 
     func grabMetadata(url: URL, tracer: RequestTracer?) async throws -> Metadata {
@@ -940,13 +1080,14 @@ extension Shelf {
         return nil
     }
 
-    func loadAllArtworks(tracer: RequestTracer? = nil) async -> [Error] {
+    mutating func loadAllArtworks(tracer: RequestTracer? = nil) async -> [Error] {
         let (images, errors) = await withTaskGroup(of: (Album, CGImage?, Error?).self) { taskGroup in
             for album in albums {
                 if album.cover == nil {
+                    let this = self
                     taskGroup.addTask {
                         do {
-                            return (album, try await loadOriginalArtwork(for: album, tracer: tracer), nil)
+                            return (album, try await this.loadOriginalArtwork(for: album, tracer: tracer), nil)
                         } catch let error {
                             return (album, nil, error)
                         }
@@ -968,23 +1109,24 @@ extension Shelf {
             return Scaler.Resolution(width: newWidth, height: newHeight)
         })
         let cictx = scaler.cictx
-        await withTaskGroup(of: Void.self) { taskGroup in
+        await withTaskGroup(of: (Album, Data).self) { taskGroup in
             for (album, image) in zip(images.map { $0.0 }, scaledImages) {
                 taskGroup.addTask {
                     await withCheckedContinuation { continuation in
                         DispatchQueue.global().async {
-                            album.cover = cictx.heifRepresentation(
+                            continuation.resume(returning: (album, cictx.heifRepresentation(
                                 of: image,
                                 format: .BGRA8,     // I did not figure out what this argument means.
                                 colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
                                 options: [.init(rawValue: kCGImageDestinationLossyCompressionQuality as String): 0.75]
-                            )!
-                            continuation.resume()
+                            )!))
                         }
                     }
                 }
             }
-            await taskGroup.reduce((), { (_, _) in () })
+            for await (album, cover) in taskGroup {
+                albums[albums.firstIndex(of: album)!].cover = cover
+            }
         }
         return errors
     }

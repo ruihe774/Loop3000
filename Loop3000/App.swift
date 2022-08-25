@@ -2,25 +2,35 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 class AppDelegate: NSObject, NSApplicationDelegate {
-    fileprivate var model: ViewModel?
+    fileprivate var model: AppModel?
 
     func applicationDidHide(_ notification: Notification) {
-        model?.windowIsHidden = true
+        model.map { model in
+            DispatchQueue.main.async {
+                model.applicationIsHidden = true
+            }
+        }
     }
 
     func applicationWillUnhide(_ notification: Notification) {
-        model?.windowIsHidden = false
+        model.map { model in
+            DispatchQueue.main.async {
+                model.applicationIsHidden = false
+            }
+        }
     }
 }
 
 @main
 struct Loop3000App: App {
-    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
-    @StateObject private var model = ViewModel()
+    @StateObject private var model = AppModel()
+
+    @State private var showDiscoverer = false
 
     var body: some Scene {
-        Window("Loop 3000", id: "main") {
+        WindowGroup {
             MainView()
             .environmentObject(model)
             .alert(model.alertModel.title, isPresented: $model.alertModel.isPresented) {
@@ -38,40 +48,15 @@ struct Loop3000App: App {
         .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(after: .newItem) {
-                Button("Add File") {
-                    model.libraryCommands.showFileAdder = true
+                Button("Discover Music") {
+                    showDiscoverer = true
                 }
                 .keyboardShortcut("a", modifiers: [.command, .option])
                 .fileImporter(
-                    isPresented: $model.libraryCommands.showFileAdder,
-                    allowedContentTypes: model.musicLibrary.canImportTypes
+                    isPresented: $showDiscoverer,
+                    allowedContentTypes: model.musicLibrary.canImportTypes + [.folder]
                 ) { result in
-                    guard let url = try? result.get() else { return }
-                    let type = UTType(filenameExtension: url.pathExtension)!
-                    if type.conforms(to: .audio) {
-                        model.musicLibrary.performScanMedia(at: url)
-                    } else {
-                        model.alert(title: "Add File", message: "Please use “Add Folder” to add the whole album.")
-                    }
-                }
-                Button("Add Folder") {
-                    model.libraryCommands.showFolderAdder = true
-                }
-                .fileImporter(
-                    isPresented: $model.libraryCommands.showFolderAdder,
-                    allowedContentTypes: [.folder]
-                ) { result in
-                    (try? result.get()).map { model.musicLibrary.performDiscoverMedia(at: $0, recursive: false) }
-                }
-                Button("Scan Recursively") {
-                    model.libraryCommands.showDiscoverer = true
-                }
-                .keyboardShortcut("d", modifiers: [.command, .option])
-                .fileImporter(
-                    isPresented: $model.libraryCommands.showDiscoverer,
-                    allowedContentTypes: [.folder]
-                ) { result in
-                    (try? result.get()).map { model.musicLibrary.performDiscoverMedia(at: $0, recursive: true) }
+                    (try? result.get()).map { model.musicLibrary.performDiscover(at: $0) }
                 }
             }
         }
