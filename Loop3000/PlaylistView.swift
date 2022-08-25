@@ -126,7 +126,7 @@ fileprivate struct PlaylistItemView: View {
                 (currentPlaying || currentPausd ?
                     Label(currentPausd ? "Paused" : "Playing", systemImage: currentPausd ? "pause.fill" : "play.fill")
                     .foregroundColor(.secondary) :
-                    Label("Item", systemImage: "list.bullet")
+                    Label("Track", systemImage: "list.bullet")
                     .foregroundColor(.clear))
                     .labelStyle(.iconOnly)
                     .frame(width: 10)
@@ -183,7 +183,7 @@ struct PlaylistView: View {
             }
         } else {
             return tracks!.map {
-                return PlaylistViewItem(
+                PlaylistViewItem(
                     track: $0,
                     album: model.musicLibrary.getAlbum(by: $0.albumId)!,
                     playlistItem: nil,
@@ -243,7 +243,76 @@ struct PlaylistView: View {
     }
 }
 
-struct MetadataItemView: View {
+fileprivate struct SizePreferenceKey: PreferenceKey {
+    static var defaultValue: CGSize = .zero
+
+    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
+        value = nextValue()
+    }
+}
+
+fileprivate struct SizeModifier: ViewModifier {
+    private var sizeView: some View {
+        GeometryReader { geo in
+            Color.clear.preference(key: SizePreferenceKey.self, value: geo.size)
+        }
+    }
+
+    func body(content: Content) -> some View {
+        content.overlay(sizeView)
+    }
+}
+
+fileprivate extension View {
+    func getSize(perform: @escaping (CGSize) -> ()) -> some View {
+        self
+            .modifier(SizeModifier())
+            .onPreferenceChange(SizePreferenceKey.self) {
+                perform($0)
+            }
+    }
+}
+
+fileprivate struct AdaptiveScrollView<Content>: View where Content: View {
+    private let content: Content
+    private let axes: Axis.Set
+    @State private var contentSize: CGSize = .zero
+    @State private var geoSize: CGSize = .zero
+    private var frameWidth: CGFloat? {
+        if axes.contains(.horizontal) {
+            return contentSize.width <= geoSize.width ? contentSize.width : nil
+        } else {
+            return contentSize.width
+        }
+    }
+    private var frameHeight: CGFloat? {
+        if axes.contains(.vertical) {
+            return contentSize.height < geoSize.height ? contentSize.height : nil
+        } else {
+            return contentSize.height
+        }
+    }
+
+    init(_ axes: Axis.Set = .vertical, @ViewBuilder content: () -> Content) {
+        self.axes = axes
+        self.content = content()
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            ScrollView(axes) {
+                content
+                    .getSize { contentSize = $0 }
+            }
+            .onChange(of: geo.size) { geoSize in
+                self.geoSize = geoSize
+            }
+        }
+        .frame(width: frameWidth, height: frameHeight)
+    }
+}
+
+fileprivate struct MetadataItemView: View {
     private let label: String
     private let text: String
     private let scrollable: Bool
@@ -262,7 +331,7 @@ struct MetadataItemView: View {
         }
     }
 
-    fileprivate init(label: String, text: String, scrollable: Bool = false, selectable: Bool = true) {
+    init(label: String, text: String, scrollable: Bool = false, selectable: Bool = true) {
         self.label = label
         self.text = text
         self.scrollable = scrollable
@@ -275,7 +344,7 @@ struct MetadataItemView: View {
                 .foregroundColor(.secondary)
             Spacer(minLength: 15)
             if scrollable {
-                ScrollView(.horizontal) {
+                AdaptiveScrollView(.horizontal) {
                     textView
                 }
                 .scrollIndicators(.never)
@@ -287,7 +356,7 @@ struct MetadataItemView: View {
     }
 }
 
-struct MetadataView: View {
+fileprivate struct MetadataView: View {
     @EnvironmentObject private var model: AppModel
 
     private let viewItem: PlaylistViewItem
@@ -296,7 +365,7 @@ struct MetadataView: View {
     }
     @State private var coverImage: CGImage?
 
-    fileprivate init(_ viewItem: PlaylistViewItem) {
+    init(_ viewItem: PlaylistViewItem) {
         self.viewItem = viewItem
     }
 
@@ -349,7 +418,7 @@ struct MetadataView: View {
                     let isFile = viewItem.track.source.isFileURL
                     MetadataItemView(
                         label: isFile ? "File" : "URL",
-                        text: isFile ? viewItem.track.source.path : viewItem.track.source.description,
+                        text: isFile ? viewItem.track.source.lastPathComponent : viewItem.track.source.description,
                         scrollable: true,
                         selectable: !isFile
                     )
