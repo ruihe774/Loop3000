@@ -259,12 +259,15 @@ class AppModel: ObservableObject {
             .sink { [unowned self] _ in objectWillChange.send() }
         )
 
-        $currentView
+        ac.append($currentView
             .withPrevious()
             .compactMap { (previousView, currentView) in
                 previousView.flatMap { $0 == currentView ? nil : $0 }
             }
-            .assign(to: &$previousView)
+            .sink { [unowned self] in
+                previousView = $0
+            }
+        )
 
         musicLibrary.$processing
             .compactMap { $0 ? .Discover : nil }

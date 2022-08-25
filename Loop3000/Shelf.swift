@@ -436,7 +436,11 @@ struct DiscoverResult {
 
 fileprivate extension DiscoverLog {
     func needsRediscover(action: DiscoverLogItem.Action, url: URL) -> Bool {
-        guard let logItem = items.first(where: { $0.url.absoluteURL == url.absoluteURL }) else {
+        guard let logItem = items.first(where: {
+            return $0.url.absoluteURL == url.absoluteURL && (
+                $0.action == action || $0.action == .grabbing && action == .importing
+            )
+        }) else {
             return true
         }
         guard let mtime = try? url.resourceValues(
