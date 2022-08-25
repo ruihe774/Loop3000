@@ -48,6 +48,7 @@ struct Loop3000App: App {
         .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(after: .newItem) {
+                Divider()
                 Button("Discover Music") {
                     showDiscoverer = true
                 }
