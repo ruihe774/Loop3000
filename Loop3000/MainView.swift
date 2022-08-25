@@ -21,8 +21,9 @@ struct WindowFinder: NSViewRepresentable {
     func updateNSView(_: NSView, context _: Context) {}
 }
 
-struct MainView: View {
+fileprivate struct InnerMainView: View {
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var windowModel: WindowModel
 
     @State var window: NSWindow?
 
@@ -44,11 +45,11 @@ struct MainView: View {
                         VStack(spacing: 0) {
                             PlayerView()
                             Divider()
-                            switch (model.currentView) {
+                            switch (windowModel.currentView) {
                             case .Discover:
                                 DiscoverView()
                             case .Playlist:
-                                let list = model.selectedList.flatMap({ model.musicLibrary.getPlaylist(by: $0) })
+                                let list = windowModel.selectedList.flatMap({ model.musicLibrary.getPlaylist(by: $0) })
                                 if list != nil {
                                     PlaylistView(list!)
                                 } else {
@@ -64,6 +65,25 @@ struct MainView: View {
             .onChange(of: window == nil) { _ in
                 window?.tabbingMode = .disallowed
             }
+        }
+    }
+}
+
+struct MainView: View {
+    @EnvironmentObject private var model: AppModel
+    @State private var windowModel: WindowModel?
+
+    var body: some View {
+        ZStack {
+            if let windowModel {
+                InnerMainView()
+                    .environmentObject(windowModel)
+            } else {
+                Spacer()
+            }
+        }
+        .onAppear {
+            windowModel = WindowModel(appModel: model)
         }
     }
 }

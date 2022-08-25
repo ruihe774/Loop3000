@@ -9,6 +9,7 @@ extension URL: Identifiable {
 
 struct DiscoverView: View {
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var windowModel: WindowModel
 
     @State private var refreshTick = 0
     private var dotCount: Int {
@@ -85,7 +86,7 @@ struct DiscoverView: View {
                 HStack {
                     Spacer()
                     Button {
-                        model.switchToPreviousView()
+                        windowModel.switchToPreviousView()
                     } label: {
                         Text("OK")
                             .frame(width: 50)

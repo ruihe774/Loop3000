@@ -229,16 +229,11 @@ class AppModel: ObservableObject {
     @Published private(set) var musicLibrary = MusicLibrary()
     @Published var alertModel = AlertModel()
 
-    @Published private(set) var currentView = ShowView.Stub
-    @Published private(set) var previousView: ShowView?
-
-    @Published var selectedList: UUID?
-    @Published var selectedItem: UUID?
     @Published private(set) var playingItem: UUID?
     @Published private(set) var playing = false
     @Published private(set) var paused = false
 
-    private var player = PlaybackScheduler()
+    fileprivate var player = PlaybackScheduler()
     var currentTimestamp: CueTime {
         player.currentTimestamp
     }
@@ -258,33 +253,6 @@ class AppModel: ObservableObject {
             .objectWillChange
             .sink { [unowned self] _ in objectWillChange.send() }
         )
-
-        ac.append($currentView
-            .withPrevious()
-            .compactMap { (previousView, currentView) in
-                previousView.flatMap { $0 == currentView ? nil : $0 }
-            }
-            .sink { [unowned self] in
-                previousView = $0
-            }
-        )
-
-        musicLibrary.$processing
-            .compactMap { $0 ? .Discover : nil }
-            .assign(to: &$currentView)
-
-        $selectedList
-            .compactMap { $0.map { _ in .Playlist } }
-            .assign(to: &$currentView)
-
-        $playingItem
-            .compactMap { [unowned self] playingItem in
-                guard let playingItem else { return nil }
-                guard let (list, _) = musicLibrary.locatePlaylistItem(by: playingItem) else { return nil }
-                guard list.id == selectedList else { return nil }
-                return playingItem
-            }
-            .assign(to: &$selectedItem)
 
         $playing
             .compactMap { $0 ? false : nil }
@@ -404,31 +372,21 @@ class AppModel: ObservableObject {
         alertModel.isPresented = true
     }
 
-    func switchToPreviousView() {
-        guard let previousView = previousView else { return }
-        currentView = previousView
-    }
-
     func play(_ itemId: UUID) {
         playingItem = itemId
         player.stop()
         player.play()
     }
 
+    private func resume() {
+        if playingItem != nil {
+            player.play()
+        }
+    }
+
     func pause() {
         paused = true
         player.pause()
-    }
-
-    func resume() {
-        if playingItem != nil {
-            player.play()
-        } else {
-            selectedList
-                .flatMap { musicLibrary.getPlaylist(by: $0) }
-                .flatMap { $0.items.first }
-                .map { play($0.id) }
-        }
     }
 
     func playPrevious() {
@@ -479,5 +437,65 @@ class AppModel: ObservableObject {
     func updateNowPlayingElapsedPlaybackTime() {
         nowPlayingCenter.nowPlayingInfo?[MPNowPlayingInfoPropertyElapsedPlaybackTime] =
             Double(player.currentTimestamp.value) / Double(CueTime.timescale)
+    }
+}
+
+@MainActor
+class WindowModel: ObservableObject {
+    @Published private(set) var currentView = ShowView.Stub
+    @Published private(set) var previousView: ShowView?
+
+    @Published var selectedList: UUID?
+    @Published var selectedItem: UUID?
+
+    unowned let appModel: AppModel
+
+    private var ac: [any Cancellable] = []
+
+    init(appModel: AppModel) {
+        self.appModel = appModel
+
+        ac.append($currentView
+            .withPrevious()
+            .compactMap { (previousView, currentView) in
+                previousView.flatMap { $0 == currentView ? nil : $0 }
+            }
+            .sink { [unowned self] in
+                previousView = $0
+            }
+        )
+
+        appModel.musicLibrary.$processing
+            .compactMap { $0 ? .Discover : nil }
+            .assign(to: &$currentView)
+
+        $selectedList
+            .compactMap { $0.map { _ in .Playlist } }
+            .assign(to: &$currentView)
+
+        appModel.$playingItem
+            .compactMap { [unowned self] playingItem in
+                guard let playingItem else { return nil }
+                guard let (list, _) = appModel.musicLibrary.locatePlaylistItem(by: playingItem) else { return nil }
+                guard list.id == selectedList else { return nil }
+                return playingItem
+            }
+            .assign(to: &$selectedItem)
+    }
+
+    func switchToPreviousView() {
+        guard let previousView = previousView else { return }
+        currentView = previousView
+    }
+
+    func resume() {
+        if appModel.playingItem != nil {
+            appModel.player.play()
+        } else {
+            selectedList
+                .flatMap { appModel.musicLibrary.getPlaylist(by: $0) }
+                .flatMap { $0.items.first }
+                .map { appModel.play($0.id) }
+        }
     }
 }

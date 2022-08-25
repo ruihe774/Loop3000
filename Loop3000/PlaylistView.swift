@@ -97,13 +97,14 @@ fileprivate struct PlaylistViewItem: EquatableIdentifiable {
 
 fileprivate struct PlaylistItemView: View {
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var windowModel: WindowModel
 
     @State private var lastTap = DispatchTime.init(uptimeNanoseconds: 0)
 
     private var viewItem: PlaylistViewItem
 
     private var selected: Bool {
-        viewItem.playlistItem != nil && model.selectedItem == viewItem.playlistItem?.id
+        viewItem.playlistItem != nil && windowModel.selectedItem == viewItem.playlistItem?.id
     }
 
     private var currentPlaying: Bool {
@@ -150,7 +151,7 @@ fileprivate struct PlaylistItemView: View {
             if now.uptimeNanoseconds - lastTap.uptimeNanoseconds < 300000000 {
                 model.play(playlistItem.id)
             } else {
-                model.selectedItem = playlistItem.id
+                windowModel.selectedItem = playlistItem.id
             }
             lastTap = now
         }
@@ -159,6 +160,7 @@ fileprivate struct PlaylistItemView: View {
 
 struct PlaylistView: View {
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var windowModel: WindowModel
 
     private struct SectionItem: Identifiable {
         let id: UUID
@@ -204,7 +206,7 @@ struct PlaylistView: View {
         return sections
     }
     private var selectedViewItem: PlaylistViewItem? {
-        guard let (list, item) = model.selectedItem.flatMap({ model.musicLibrary.locatePlaylistItem(by: $0) }) else {
+        guard let (list, item) = windowModel.selectedItem.flatMap({ model.musicLibrary.locatePlaylistItem(by: $0) }) else {
             return nil
         }
         guard list == playlist else {

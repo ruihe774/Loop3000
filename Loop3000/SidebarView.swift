@@ -11,6 +11,7 @@ fileprivate struct SidebarMaterial: NSViewRepresentable {
 
 struct Sidebar: View {
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var windowModel: WindowModel
 
     @State private var filterString = ""
 
@@ -63,9 +64,9 @@ struct Sidebar: View {
                     ForEach(
                         listType == .albums ? model.musicLibrary.albumPlaylists : model.musicLibrary.manualPlaylists
                     ) { playlist in
-                        let selected = model.selectedList == playlist.id
+                        let selected = windowModel.selectedList == playlist.id
                         Button {
-                            model.selectedList = playlist.id
+                            windowModel.selectedList = playlist.id
                         } label: {
                             ScrollView(.horizontal) {
                                 Text(playlist.title)
@@ -89,7 +90,7 @@ struct Sidebar: View {
         .frame(width: 250)
         .background(SidebarMaterial())
         .onAppear {
-            guard let selectedList = model.selectedList else { return }
+            guard let selectedList = windowModel.selectedList else { return }
             listType = model.musicLibrary.albumPlaylists.contains(where: { $0.id == selectedList }) ? .albums : .playlists
         }
     }

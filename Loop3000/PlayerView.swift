@@ -3,6 +3,7 @@ import Combine
 
 struct PlayerView: View {
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var windowModel: WindowModel
 
     @State private var sliderValue = 0.0
     @State private var duration = Int.max
@@ -25,7 +26,7 @@ struct PlayerView: View {
                 if model.playing {
                     model.pause()
                 } else {
-                    model.resume()
+                    windowModel.resume()
                 }
             } label: {
                 (model.playing ? Label("Pause", systemImage: "pause.fill") : Label("Play", systemImage: "play.fill"))
