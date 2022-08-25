@@ -9,7 +9,7 @@ fileprivate struct Stub: View {
     }
 }
 
-fileprivate struct WindowFinder: NSViewRepresentable {
+struct WindowFinder: NSViewRepresentable {
     @Binding var window: NSWindow?
     func makeNSView(context _: Self.Context) -> NSView {
         let view = NSView()

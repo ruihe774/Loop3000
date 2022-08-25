@@ -24,6 +24,7 @@ struct DiscoverView: View {
             VStack(alignment: .leading, spacing: 0) {
                 Label("Discovering your music" + String(repeating: ".", count: dotCount), systemImage: "magnifyingglass.circle")
                     .font(.headline)
+                    .symbolRenderingMode(.hierarchical)
                     .padding()
                 Divider()
                 if model.musicLibrary.requesting.isEmpty {
@@ -69,9 +70,9 @@ struct DiscoverView: View {
                 }
                 Divider()
                 if !model.musicLibrary.returnedErrors.isEmpty {
-                    Label("Encountered errors", systemImage: "exclamationmark.triangle")
+                    Label("Encountered errors", systemImage: "exclamationmark.triangle.fill")
                         .font(.headline)
-                        .foregroundColor(.yellow)
+                        .symbolRenderingMode(.multicolor)
                         .padding()
                     Divider()
                     List(model.musicLibrary.returnedErrors.map { (id: UUID(), error: $0) }, id: \.id) { (_, error) in

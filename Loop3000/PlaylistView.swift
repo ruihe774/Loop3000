@@ -373,7 +373,7 @@ fileprivate struct MetadataView: View {
         ZStack {
             if let coverImage {
                 GeometryReader { geo in
-                    Image(coverImage, scale: 1, label: Text("Background"))
+                    Image(decorative: coverImage, scale: 1)
                         .resizable()
                         .frame(height: geo.size.height)
                 }
