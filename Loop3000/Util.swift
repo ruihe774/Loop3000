@@ -192,7 +192,8 @@ actor SerialAsyncQueue {
     private var processing = false
     private var queue = Deque<() async -> ()>()
 
-    func process() async {
+    private func process() async {
+        guard !processing else { return }
         processing = true
         while let operation = queue.popFirst() {
             let _ = await Task.detached {
@@ -204,10 +205,8 @@ actor SerialAsyncQueue {
 
     func enqueue(_ operation: @Sendable @escaping () async -> ()) {
         queue.append(operation)
-        if !processing {
-            Task {
-                await process()
-            }
+        Task {
+            await process()
         }
     }
 }
