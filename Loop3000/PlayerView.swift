@@ -28,7 +28,7 @@ struct PlayerView: View {
                     model.resume()
                 }
             } label: {
-                (model.playing && !model.paused ? Label("Pause", systemImage: "pause.fill") : Label("Play", systemImage: "play.fill"))
+                (model.playing ? Label("Pause", systemImage: "pause.fill") : Label("Play", systemImage: "play.fill"))
                     .labelStyle(.iconOnly)
             }
             .font(.largeTitle)
