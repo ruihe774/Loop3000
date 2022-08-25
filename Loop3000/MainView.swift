@@ -33,8 +33,7 @@ fileprivate struct InnerMainView: View {
         } else {
             ZStack {
                 if window == nil {
-                    Spacer()
-                        .background(WindowFinder(window: $window))
+                    WindowFinder(window: $window)
                 }
                 HStack(spacing: 0) {
                     Sidebar()
@@ -65,6 +64,9 @@ fileprivate struct InnerMainView: View {
             .onChange(of: window == nil) { _ in
                 window?.tabbingMode = .disallowed
             }
+            .navigationTitle(windowModel.selectedList.flatMap {
+                model.musicLibrary.getPlaylist(by: $0)?.title
+            } ?? "Loop3000")
         }
     }
 }

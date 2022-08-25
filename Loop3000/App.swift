@@ -65,6 +65,7 @@ fileprivate struct Loop3000App: App {
             }
         }
         .windowResizability(.contentSize)
+        .commandsRemoved()
     }
 }
 
@@ -119,17 +120,18 @@ fileprivate struct AlertView: View {
                 Button {
                     window!.close()
                 } label: {
-                    Text("OK")
+                    Text("Close")
                         .frame(width: 50)
                 }
                 .keyboardShortcut(.defaultAction)
             }
             .scenePadding()
             .frame(width: 400)
+            .frame(maxHeight: 200)
             .onChange(of: window == nil) { _ in
                 guard let window else { return }
+                window.delegate = delegate
                 if isPresent {
-                    window.delegate = delegate
                     NSApp!.runModal(for: window)
                 } else {
                     window.close()
