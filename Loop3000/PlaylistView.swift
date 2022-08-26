@@ -375,9 +375,13 @@ fileprivate struct MetadataView: View {
         ZStack {
             if let coverImage {
                 GeometryReader { geo in
-                    Image(decorative: coverImage, scale: 1)
-                        .resizable()
-                        .frame(height: geo.size.height)
+                    ZStack(alignment: .center) {
+                        Image(decorative: coverImage, scale: 1)
+                            .resizable()
+                            .aspectRatio(1, contentMode: .fill)
+                    }
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .clipped()
                 }
             } else {
                 Rectangle().fill(Color(nsColor: .controlBackgroundColor))
@@ -390,48 +394,49 @@ fileprivate struct MetadataView: View {
                         .cornerRadius(2)
                         .shadow(radius: 1)
                 }
-                VStack(spacing: 5) {
-                    if let title = viewItem.title {
-                        MetadataItemView(label: "Title", text: title)
-                    }
-                    if let album = viewItem.albumTitle {
-                        MetadataItemView(label: "Album", text: album)
-                    }
-                    let artists = viewItem.artists
-                    if !artists.isEmpty {
-                        let artistLabel = artists.count > 1 ? "Artists" : "Artist"
-                        MetadataItemView(label: artistLabel, text: artists.joined(separator: "\n"))
-                    }
-                    let albumArtists = viewItem.albumArtists
-                    if !albumArtists.isEmpty && artists != albumArtists {
-                        let artistLabel = albumArtists.count > 1 ? "Artists" : "Artist"
-                        MetadataItemView(label: "Album " + artistLabel, text: albumArtists.joined(separator: "\n"))
-                    }
-                    if let discNumber = viewItem.discNumber {
-                        MetadataItemView(label: "Disc Number", text: "\(discNumber)")
-                    }
-                    if let trackNumber = viewItem.trackNumber {
-                        MetadataItemView(label: "Track Number", text: "\(trackNumber)")
-                    }
-                    if let duration = viewItem.duration {
-                        MetadataItemView(label: "Duration", text: duration)
-                    }
-                    // XXX: Add more field
-                    let isFile = viewItem.track.source.isFileURL
-                    MetadataItemView(
-                        label: isFile ? "File" : "URL",
-                        text: isFile ? viewItem.track.source.lastPathComponent : viewItem.track.source.description,
-                        scrollable: true,
-                        selectable: !isFile
-                    )
-                    .onTapGesture {
-                        if isFile {
-                            NSWorkspace.shared.activateFileViewerSelecting([viewItem.track.source])
+                ScrollView {
+                    VStack(spacing: 5) {
+                        if let title = viewItem.title {
+                            MetadataItemView(label: "Title", text: title)
+                        }
+                        if let album = viewItem.albumTitle {
+                            MetadataItemView(label: "Album", text: album)
+                        }
+                        let artists = viewItem.artists
+                        if !artists.isEmpty {
+                            let artistLabel = artists.count > 1 ? "Artists" : "Artist"
+                            MetadataItemView(label: artistLabel, text: artists.joined(separator: "\n"))
+                        }
+                        let albumArtists = viewItem.albumArtists
+                        if !albumArtists.isEmpty && artists != albumArtists {
+                            let artistLabel = albumArtists.count > 1 ? "Artists" : "Artist"
+                            MetadataItemView(label: "Album " + artistLabel, text: albumArtists.joined(separator: "\n"))
+                        }
+                        if let discNumber = viewItem.discNumber {
+                            MetadataItemView(label: "Disc Number", text: "\(discNumber)")
+                        }
+                        if let trackNumber = viewItem.trackNumber {
+                            MetadataItemView(label: "Track Number", text: "\(trackNumber)")
+                        }
+                        if let duration = viewItem.duration {
+                            MetadataItemView(label: "Duration", text: duration)
+                        }
+                        // XXX: Add more field
+                        let isFile = viewItem.track.source.isFileURL
+                        MetadataItemView(
+                            label: isFile ? "File" : "URL",
+                            text: isFile ? viewItem.track.source.lastPathComponent : viewItem.track.source.description,
+                            scrollable: true,
+                            selectable: !isFile
+                        )
+                        .onTapGesture {
+                            if isFile {
+                                NSWorkspace.shared.activateFileViewerSelecting([viewItem.track.source])
+                            }
                         }
                     }
+                    .padding()
                 }
-                .padding()
-                Spacer()
             }
             .padding()
             .background(.thickMaterial)
