@@ -216,6 +216,7 @@ struct PlaylistView: View {
         let album = model.musicLibrary.getAlbum(by: track.albumId)!
         return PlaylistViewItem(track: track, album: album, playlistItem: item, playlist: list)
     }
+    @State private var selectedViewItemAnimated: PlaylistViewItem?
 
     init(tracks: [Track]) {
         self.tracks = tracks
@@ -237,9 +238,14 @@ struct PlaylistView: View {
                     }
                 }
             }
-            if let selectedViewItem {
+            if let selectedViewItemAnimated {
                 Divider()
-                MetadataView(selectedViewItem)
+                MetadataView(selectedViewItemAnimated)
+            }
+        }
+        .onChange(of: selectedViewItem) { selectedViewItem in
+            withAnimation {
+                selectedViewItemAnimated = selectedViewItem
             }
         }
     }
@@ -391,7 +397,7 @@ fileprivate struct MetadataView: View {
                     Image(coverImage, scale: 1, label: Text("Cover Artwork"))
                         .resizable()
                         .scaledToFit()
-                        .cornerRadius(2)
+                        .cornerRadius(3)
                         .shadow(radius: 1)
                 }
                 ScrollView {
@@ -429,6 +435,7 @@ fileprivate struct MetadataView: View {
                             scrollable: true,
                             selectable: !isFile
                         )
+                        .clickable(enabled: isFile)
                         .onTapGesture {
                             if isFile {
                                 NSWorkspace.shared.activateFileViewerSelecting([viewItem.track.source])

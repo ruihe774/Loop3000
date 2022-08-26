@@ -1,6 +1,29 @@
 import SwiftUI
 import Combine
 
+fileprivate struct ClickableModifier: ViewModifier {
+    @State private var hovering = false
+    private let enabled: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .onHover { hover in withAnimation { hovering = hover } }
+            .background(RoundedRectangle(cornerRadius: 3).fill(
+                hovering && enabled ? Color(nsColor: .quaternaryLabelColor).opacity(0.5) : .clear
+            ))
+    }
+
+    init(enabled: Bool = true) {
+        self.enabled = enabled
+    }
+}
+
+extension View {
+    func clickable(enabled: Bool = true) -> some View {
+        modifier(ClickableModifier(enabled: enabled))
+    }
+}
+
 struct PlayerView: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var windowModel: WindowModel
@@ -69,6 +92,28 @@ struct PlayerView: View {
         .scenePadding([.leading, .trailing])
         .padding(.top, 32)
         .padding(.bottom, 28)
+        .overlay {
+            if let (list, item) = model.playingItem.flatMap({ model.musicLibrary.locatePlaylistItem(by: $0) }) {
+                let track = model.musicLibrary.getTrack(by: item.trackId)!
+                let title = track.metadata[\.title] ?? track.source.lastPathComponent
+                HStack {
+                    Spacer()
+                    Button {
+                        windowModel.selectedList = list.id
+                        windowModel.selectedItem = item.id
+                    } label: {
+                        Label(title, systemImage: "waveform")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(3)
+                    .clickable(enabled: windowModel.selectedList != list.id || windowModel.selectedItem != item.id)
+                }
+                .offset(CGSize(width: -20, height: 20))
+            } else {
+                Spacer()
+            }
+        }
     }
 
     private func updateDuration(_ itemId: UUID?) {

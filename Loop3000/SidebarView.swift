@@ -47,7 +47,7 @@ struct Sidebar: View {
                         .labelStyle(.iconOnly)
                 }
                 .foregroundColor(listType == .albums ? .accentColor : .secondary)
-                .buttonStyle(.borderless)
+                .buttonStyle(.plain)
                 Button {
                     listType = .playlists
                 } label: {
@@ -55,7 +55,7 @@ struct Sidebar: View {
                         .labelStyle(.iconOnly)
                 }
                 .foregroundColor(listType == .playlists ? .accentColor : .secondary)
-                .buttonStyle(.borderless)
+                .buttonStyle(.plain)
                 .disabled(true)
             }
             .font(.title2)
@@ -71,12 +71,11 @@ struct Sidebar: View {
                             ScrollView(.horizontal) {
                                 Text(playlist.title)
                                     .help(playlist.title)
-                                    .foregroundColor(.primary)
                             }
                             .scrollIndicators(.never)
                             .padding(6)
                         }
-                        .buttonStyle(.borderless)
+                        .buttonStyle(.plain)
                         .padding(2)
                         .background(selected ? Color(nsColor: .quaternaryLabelColor) : .clear)
                         .cornerRadius(8)
