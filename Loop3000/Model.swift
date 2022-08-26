@@ -455,15 +455,12 @@ class WindowModel: ObservableObject {
     init(appModel: AppModel) {
         self.appModel = appModel
 
-        ac.append($currentView
+        $currentView
             .withPrevious()
-            .compactMap { (previousView, currentView) in
+            .compactMap { (previousView, currentView) -> ShowView? in
                 previousView.flatMap { $0 == currentView ? nil : $0 }
             }
-            .sink { [unowned self] in
-                previousView = $0
-            }
-        )
+            .assign(to: &$previousView)
 
         appModel.musicLibrary.$processing
             .compactMap { $0 ? .Discover : nil }
