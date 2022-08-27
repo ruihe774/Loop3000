@@ -414,6 +414,15 @@ class AppModel: ObservableObject {
             self?.pause()
             return .success
         }
+        remoteControlCenter.togglePlayPauseCommand.addTarget { [weak self] _ in
+            guard let self else { return .success }
+            if self.playing {
+                self.pause()
+            } else {
+                self.resume()
+            }
+            return .success
+        }
         remoteControlCenter.previousTrackCommand.addTarget { [weak self]  _ in
             self?.playPrevious()
             return .success
