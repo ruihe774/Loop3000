@@ -13,8 +13,6 @@ struct Sidebar: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var windowModel: WindowModel
 
-    @State private var filterString = ""
-
     private enum ListType {
         case albums
         case playlists
@@ -22,43 +20,9 @@ struct Sidebar: View {
     @State private var listType = ListType.albums
 
     var body: some View {
-        VStack {
-            TextField(text: $filterString) {}
-                .padding(.leading, 23.5)
-                .overlay {
-                    HStack {
-                        Image(systemName: "magnifyingglass")
-                        filterString.isEmpty ? Text("Search") : nil
-                        Spacer()
-                    }
-                    .foregroundColor(.secondary)
-                }
-                .padding([.leading, .trailing], 10)
-                .frame(height: 30)
-                .textFieldStyle(.plain)
-                .background(RoundedRectangle(cornerRadius: 8).fill(Color(nsColor: .quaternaryLabelColor).opacity(0.5)))
-                .padding(.bottom, 10)
-                .disabled(true)
-            HStack(spacing: 15) {
-                Button {
-                    listType = .albums
-                } label: {
-                    Label("Albums", systemImage: listType == .albums ? "opticaldisc.fill" : "opticaldisc")
-                        .labelStyle(.iconOnly)
-                }
-                .foregroundColor(listType == .albums ? .accentColor : .secondary)
-                .buttonStyle(.plain)
-                Button {
-                    listType = .playlists
-                } label: {
-                    Label("Playlists", systemImage: "music.note.list")
-                        .labelStyle(.iconOnly)
-                }
-                .foregroundColor(listType == .playlists ? .accentColor : .secondary)
-                .buttonStyle(.plain)
-                .disabled(true)
-            }
-            .font(.title2)
+        VStack(alignment: .center) {
+            Text("Loop3000")
+                .font(.headline)
             ScrollView {
                 LazyVStack(spacing: -4) {
                     ForEach(
@@ -71,18 +35,19 @@ struct Sidebar: View {
                             ScrollView(.horizontal) {
                                 Text(playlist.title)
                                     .help(playlist.title)
+                                    .foregroundColor(.primary)
                             }
                             .scrollIndicators(.never)
                             .padding(6)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.borderless)
                         .padding(2)
                         .background(selected ? Color(nsColor: .quaternaryLabelColor) : .clear)
                         .cornerRadius(8)
                     }
                 }
-                .scrollContentBackground(.hidden)
             }
+            .scrollContentBackground(.hidden)
         }
         .scenePadding([.leading, .trailing])
         .padding([.top, .bottom], 30)

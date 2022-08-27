@@ -104,10 +104,11 @@ struct PlayerView: View {
                     } label: {
                         Label(title, systemImage: "waveform")
                             .font(.caption)
+                            .foregroundColor(.primary)
+                            .padding(3)
+                            .clickable(enabled: windowModel.selectedList != list.id || windowModel.selectedItem != item.id)
                     }
-                    .buttonStyle(.plain)
-                    .padding(3)
-                    .clickable(enabled: windowModel.selectedList != list.id || windowModel.selectedItem != item.id)
+                    .buttonStyle(.borderless)
                 }
                 .offset(CGSize(width: -20, height: 20))
             } else {

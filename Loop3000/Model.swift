@@ -158,10 +158,6 @@ class MusicLibrary: ObservableObject {
         }
     }
 
-    var canImportTypes: [UTType] {
-        mediaImporters.flatMap { $0.supportedTypes }
-    }
-
     func locatePlaylistItem(by itemId: UUID) -> (Playlist, PlaylistItem)? {
         playlistItemMap[itemId]
     }

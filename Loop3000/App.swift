@@ -50,7 +50,7 @@ fileprivate struct Loop3000App: App {
                 .keyboardShortcut("a", modifiers: [.command, .option])
                 .fileImporter(
                     isPresented: $showDiscoverer,
-                    allowedContentTypes: model.musicLibrary.canImportTypes + [.folder]
+                    allowedContentTypes: [.folder]
                 ) { result in
                     (try? result.get()).map { model.musicLibrary.performDiscover(at: $0) }
                 }
