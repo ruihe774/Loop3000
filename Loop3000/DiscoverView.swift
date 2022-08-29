@@ -1,9 +1,8 @@
 import SwiftUI
-import Combine
 
 extension URL: Identifiable {
     public var id: String {
-        absoluteString
+        normalizedString
     }
 }
 
@@ -20,15 +19,20 @@ struct DiscoverView: View {
         model.musicLibrary.sorted(tracks: model.musicLibrary.importedTracks)
     }
 
+    @State private var uniqueRequesting: [URL] = []
+    @State private var processing = false
+
     var body: some View {
-        if model.musicLibrary.processing {
-            VStack(alignment: .leading, spacing: 0) {
-                Label("Discovering your music" + String(repeating: ".", count: dotCount), systemImage: "magnifyingglass.circle")
+        VStack(alignment: .leading, spacing: 0) {
+            if processing {
+                Text("Discovering your music" + String(repeating: ".", count: dotCount))
                     .font(.headline)
-                    .symbolRenderingMode(.hierarchical)
                     .padding()
+                    .onReceive(model.refreshTimer, perform: { _ in
+                        refreshTick += 1
+                    })
                 Divider()
-                if model.musicLibrary.requesting.isEmpty {
+                if uniqueRequesting.isEmpty {
                     Spacer()
                     HStack {
                         Spacer()
@@ -37,7 +41,7 @@ struct DiscoverView: View {
                     }
                     Spacer()
                 } else {
-                    List(model.musicLibrary.requesting.dropDuplicates()) { url in
+                    List(uniqueRequesting) { url in
                         HStack(spacing: 8) {
                             ProgressView().scaleEffect(0.5)
                             Text(url.pathDescription)
@@ -47,13 +51,11 @@ struct DiscoverView: View {
                         .frame(height: 16)
                     }
                     .listStyle(.plain)
+                    .onAnimatedValue(of: model.musicLibrary.requesting) { requesting in
+                        uniqueRequesting = requesting.dropDuplicates()
+                    }
                 }
-            }
-            .onReceive(model.refreshTimer, perform: { _ in
-                refreshTick += 1
-            })
-        } else {
-            VStack(alignment: .leading, spacing: 0) {
+            } else {
                 if !model.musicLibrary.importedTracks.isEmpty {
                     Label("Imported music", systemImage: "square.and.arrow.down.on.square")
                         .font(.headline)
@@ -61,13 +63,13 @@ struct DiscoverView: View {
                     Divider()
                     PlaylistView(tracks: sortedImportedTracks)
                 } else if model.musicLibrary.returnedErrors.isEmpty {
-                    Spacer()
+                    Spacer(minLength: 50)
                     HStack {
                         Spacer()
                         Text("Your music library is up to date.")
                         Spacer()
                     }
-                    Spacer()
+                    Spacer(minLength: 50)
                 }
                 Divider()
                 if !model.musicLibrary.returnedErrors.isEmpty {
@@ -95,6 +97,9 @@ struct DiscoverView: View {
                 }
                 .padding()
             }
+        }
+        .onAnimatedValue(of: model.musicLibrary.processing) {
+            processing = $0
         }
     }
 }

@@ -25,48 +25,38 @@ fileprivate struct InnerMainView: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var windowModel: WindowModel
 
-    @State var window: NSWindow?
+    @State private var currentView = ShowView.stub
 
     var body: some View {
         if model.applicationIsHidden {
             Spacer()
         } else {
-            ZStack {
-                if window == nil {
-                    WindowFinder(window: $window)
-                }
-                HStack(spacing: 0) {
-                    Sidebar()
-                    ZStack {
-                        Rectangle()
-                            .fill(Color(nsColor: .windowBackgroundColor))
-                            .shadow(radius: 1)
-                        VStack(spacing: 0) {
-                            PlayerView()
-                            Divider()
-                            switch (windowModel.currentView) {
-                            case .Discover:
-                                DiscoverView()
-                            case .Playlist:
-                                let list = windowModel.selectedList.flatMap({ model.musicLibrary.getPlaylist(by: $0) })
-                                if list != nil {
-                                    PlaylistView(list!)
-                                } else {
-                                    Stub()
-                                }
-                            default:
-                                Stub()
-                            }
+            HStack(spacing: 0) {
+                Sidebar()
+                ZStack {
+                    Rectangle()
+                        .fill(Color.windowBackgroundColor)
+                        .shadow(radius: 1)
+                    VStack(spacing: 0) {
+                        PlayerView()
+                        Divider()
+                        switch (currentView) {
+                        case .discover:
+                            DiscoverView()
+                        case .playlist where windowModel.selectedList.flatMap({ model.musicLibrary.playlists[$0] }) != nil:
+                            PlaylistView(windowModel.selectedList!)
+                        default:
+                            Stub()
                         }
                     }
                 }
             }
-            .onChange(of: window == nil) { _ in
-                window?.tabbingMode = .disallowed
-            }
             .navigationTitle(windowModel.selectedList.flatMap {
-                model.musicLibrary.getPlaylist(by: $0)?.title
+                model.musicLibrary.playlists[$0]?.title
             } ?? "Loop3000")
+            .onAnimatedValue(of: windowModel.currentView) {
+                currentView = $0
+            }
         }
     }
 }
@@ -75,8 +65,13 @@ struct MainView: View {
     @EnvironmentObject private var model: AppModel
     @State private var windowModel: WindowModel?
 
+    @State private var window: NSWindow?
+
     var body: some View {
         ZStack {
+            if window == nil {
+                WindowFinder(window: $window)
+            }
             if let windowModel {
                 InnerMainView()
                     .environmentObject(windowModel)
@@ -86,6 +81,9 @@ struct MainView: View {
         }
         .onAppear {
             windowModel = WindowModel(appModel: model)
+        }
+        .onChange(of: window == nil) { _ in
+            window?.tabbingMode = .disallowed
         }
     }
 }

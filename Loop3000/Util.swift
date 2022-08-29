@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import SwiftUI
 import UniformTypeIdentifiers
 import Collections
 
@@ -71,9 +72,7 @@ extension Array where Element: Identifiable {
     func get(by id: Element.ID) -> Element? {
         first { $0.id == id }
     }
-}
 
-extension Array where Element: Identifiable {
     func dropDuplicates() -> Self {
         var r: Self = []
         var s: Set<Element.ID> = []
@@ -83,6 +82,10 @@ extension Array where Element: Identifiable {
             s.insert(elem.id)
         }
         return r
+    }
+
+    func makeDictionary() -> [Element.ID: Element] {
+        Dictionary(uniqueKeysWithValues: map { ($0.id, $0) })
     }
 }
 
@@ -96,8 +99,16 @@ extension URL {
         deletingPathExtension().appendingPathExtension(pathExtension)
     }
 
+    var normalizedURL: URL {
+        isFileURL ? standardizedFileURL : absoluteURL
+    }
+
+    var normalizedString: String {
+        normalizedURL.description
+    }
+
     var pathDescription: String {
-        isFileURL ? path : description
+        isFileURL ? path(percentEncoded: false) : description
     }
 
     var isDirectory: Bool? {
@@ -208,5 +219,68 @@ actor SerialAsyncQueue {
         Task {
             await process()
         }
+    }
+}
+
+extension Color {
+    static let labelColor = Color(nsColor: .labelColor)
+    static let secondaryLabelColor = Color(nsColor: .secondaryLabelColor)
+    static let tertiaryLabelColor = Color(nsColor: .tertiaryLabelColor)
+    static let quaternaryLabelColor = Color(nsColor: .quaternaryLabelColor)
+
+    static let textColor = Color(nsColor: .textColor)
+    static let placeholderTextColor = Color(nsColor: .placeholderTextColor)
+    static let selectedTextColor = Color(nsColor: .selectedTextColor)
+    static let textBackgroundColor = Color(nsColor: .textBackgroundColor)
+    static let selectedTextBackgroundColor = Color(nsColor: .selectedTextBackgroundColor)
+    static let keyboardFocusIndicatorColor = Color(nsColor: .keyboardFocusIndicatorColor)
+    static let unemphasizedSelectedTextColor = Color(nsColor: .unemphasizedSelectedTextColor)
+    static let unemphasizedSelectedTextBackgroundColor = Color(nsColor: .unemphasizedSelectedTextBackgroundColor)
+
+    static let linkColor = Color(nsColor: .linkColor)
+    static let separatorColor = Color(nsColor: .separatorColor)
+    static let selectedContentBackgroundColor = Color(nsColor: .selectedContentBackgroundColor)
+    static let unemphasizedSelectedContentBackgroundColor = Color(nsColor: .unemphasizedSelectedContentBackgroundColor)
+
+    static let selectedMenuItemTextColor = Color(nsColor: .selectedMenuItemTextColor)
+
+    static let gridColor = Color(nsColor: .gridColor)
+    static let headerTextColor = Color(nsColor: .headerTextColor)
+    static let alternatingContentBackgroundColors = NSColor.alternatingContentBackgroundColors.map { Color(nsColor: $0) }
+
+    static let controlAccentColor = Color(nsColor: .controlAccentColor)
+    static let controlColor = Color(nsColor: .controlColor)
+    static let controlBackgroundColor = Color(nsColor: .controlBackgroundColor)
+    static let controlTextColor = Color(nsColor: .controlTextColor)
+    static let disabledControlTextColor = Color(nsColor: .disabledControlTextColor)
+
+    static let selectedControlColor = Color(nsColor: .selectedControlColor)
+    static let selectedControlTextColor = Color(nsColor: .selectedControlTextColor)
+    static let alternateSelectedControlTextColor = Color(nsColor: .alternateSelectedControlTextColor)
+    static let scrubberTexturedBackground = Color(nsColor: .scrubberTexturedBackground)
+
+    static let windowBackgroundColor = Color(nsColor: .windowBackgroundColor)
+    static let windowFrameTextColor = Color(nsColor: .windowFrameTextColor)
+    static let underPageBackgroundColor = Color(nsColor: .underPageBackgroundColor)
+
+    static let findHighlightColor = Color(nsColor: .findHighlightColor)
+    static let highlightColor = Color(nsColor: .highlightColor)
+    static let shadowColor = Color(nsColor: .shadowColor)
+}
+
+extension Color {
+    static let selectedBackgroundColor = Color.quaternaryLabelColor
+    static let interactiveBackgroundColor = Color.selectedBackgroundColor.opacity(0.5)
+}
+
+extension View {
+    func onAnimatedValue<T: Equatable>(of value: T, perform: @escaping (T) -> ()) -> some View {
+        self
+            .onChange(of: value) { value in
+                withAnimation { perform(value) }
+            }
+            .onAppear {
+                perform(value)
+            }
     }
 }

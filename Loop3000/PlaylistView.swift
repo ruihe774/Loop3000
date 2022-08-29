@@ -1,144 +1,50 @@
 import SwiftUI
-import CoreGraphics
 
-fileprivate struct PlaylistViewItem: EquatableIdentifiable {
-    let id: UUID
-    let track: Track
-    let album: Album
-    let playlistItem: PlaylistItem?
-    let playlist: Playlist?
-
-    var title: String? {
-        track.metadata[\.title]
-    }
-
-    var uiTitle: String {
-        title ?? track.source.lastPathComponent
-    }
-
-    var artists: [String] {
-        let artistsString = track.metadata[\.artist]
-            ?? album.metadata[\.artist]
-            ?? ""
-        switch artistsString {
-        case "Various Artists": fallthrough
-        case "V.A.": fallthrough
-        case "VA": return []
-        default:
-            return universalSplit(
-                artistsString
-            )
-        }
-    }
-
-    var trackNumber: Int? {
-        track.metadata[\.trackNumber].flatMap { Int($0) }
-    }
-
-    var discNumber: Int? {
-        track.metadata[\.discNumber].flatMap { Int($0) }
-    }
-
-    var indexString: String? {
-        guard let trackNumber = trackNumber else { return nil }
-        if let discNumber = discNumber {
-            return String(format: "%d.%02d", discNumber, trackNumber)
-        } else {
-            return String(format: "%02d", trackNumber)
-        }
-    }
-
-    var albumTitle: String? {
-        album.metadata[\.title]
-    }
-
-    var albumArtists: [String] {
-        let artistsString = album.metadata[\.artist] ?? ""
-        switch artistsString {
-        case "Various Artists": fallthrough
-        case "V.A.": fallthrough
-        case "VA": return []
-        default:
-            return universalSplit(
-                artistsString
-            )
-        }
-    }
-
-    var combinedTitle: String {
-        if !artists.isEmpty && artists != albumArtists {
-            return uiTitle + " / " + artists.joined(separator: "; ")
-        } else {
-            return uiTitle
-        }
-    }
-
-    var combinedAlbumTitle: String? {
-        guard let albumTitle = albumTitle else { return nil }
-        if albumArtists.isEmpty {
-            return albumTitle
-        } else {
-            return albumTitle + " / " + albumArtists.joined(separator: "; ")
-        }
-    }
-
-    var duration: String? {
-        return CueTime.difference(track.end, track.start)?.shortDescription
-    }
-
-    init(track: Track, album: Album, playlistItem: PlaylistItem?, playlist: Playlist?) {
-        self.id = playlistItem?.id ?? track.id
-        self.track = track
-        self.album = album
-        self.playlistItem = playlistItem
-        self.playlist = playlist
-    }
-}
-
-fileprivate struct PlaylistItemView: View {
+fileprivate struct MusicPieceView: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var windowModel: WindowModel
 
     @State private var lastTap = DispatchTime.init(uptimeNanoseconds: 0)
 
-    private var viewItem: PlaylistViewItem
+    private var piece: MusicPiece
 
     private var selected: Bool {
-        viewItem.playlistItem != nil && windowModel.selectedItem == viewItem.playlistItem?.id
+        windowModel.selectedPiece == piece || windowModel.selectedPieces.contains(piece)
     }
 
     private var currentPlaying: Bool {
-        viewItem.playlistItem != nil && model.playing && model.playingItem == viewItem.playlistItem?.id
+        model.playingPiece == piece && model.playbackState == .playing
     }
 
-    private var currentPausd: Bool {
-        viewItem.playlistItem != nil && model.paused && model.playingItem == viewItem.playlistItem?.id
+    private var currentPaused: Bool {
+        model.playingPiece == piece && model.playbackState == .paused
     }
 
-    init(_ viewItem: PlaylistViewItem) {
-        self.viewItem = viewItem
+    init(_ piece: MusicPiece) {
+        self.piece = piece
     }
 
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 5)
-                .fill(selected ? Color(nsColor: .quaternaryLabelColor) : Color.black.opacity(0.001))
+                .fill(selected ? Color.selectedBackgroundColor : Color.black.opacity(0.001))
             HStack {
-                (currentPlaying || currentPausd ?
-                    Label(currentPausd ? "Paused" : "Playing", systemImage: currentPausd ? "pause.fill" : "play.fill")
+                (currentPlaying || currentPaused ?
+                    Label(currentPaused ? "Paused" : "Playing", systemImage: currentPaused ? "pause.fill" : "play.fill")
                     .foregroundColor(.secondary) :
                     Label("Track", systemImage: "list.bullet")
                     .foregroundColor(.clear))
                     .labelStyle(.iconOnly)
                     .frame(width: 10)
-                Text(viewItem.indexString ?? "")
+                Text(piece.indexString ?? "")
                     .font(.body.monospacedDigit())
                     .frame(width: 30)
-                Text(viewItem.combinedTitle)
-                    .help(viewItem.combinedTitle)
+                Text(piece.combinedTitle)
+                    .help(piece.combinedTitle)
                     .scaledToFit()
                 Spacer()
-                Text(viewItem.duration ?? "")
+                Text(piece.durationString ?? "")
+                    .help(piece.duration?.description ?? "")
                     .font(.body.monospacedDigit())
             }
             .frame(height: 20)
@@ -146,12 +52,11 @@ fileprivate struct PlaylistItemView: View {
             .padding(.trailing, 30)
         }
         .onTapGesture {
-            guard let playlistItem = viewItem.playlistItem else { return }
             let now = DispatchTime.now()
             if now.uptimeNanoseconds - lastTap.uptimeNanoseconds < 300000000 {
-                model.play(playlistItem.id)
+                model.play(piece)
             } else {
-                windowModel.selectedItem = playlistItem.id
+                windowModel.selectedPiece = piece
             }
             lastTap = now
         }
@@ -162,91 +67,87 @@ struct PlaylistView: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var windowModel: WindowModel
 
-    private struct SectionItem: Identifiable {
-        let id: UUID
-        let album: Album
-        var items: [PlaylistViewItem]
+    @MainActor
+    private struct AlbumSection: Identifiable {
+        var pieces: [MusicPiece]
 
-        init(album: Album, items: [PlaylistViewItem]) {
-            self.id = items.first!.id
-            self.album = album
-            self.items = items
+        let id: UUID
+
+        var album: Album? {
+            pieces.first!.album
+        }
+
+        var title: String {
+            pieces.first!.combinedAlbumTitle ?? "<No Title>"
+        }
+
+        init(pieces: [MusicPiece]) {
+            self.id = pieces.first!.id
+            self.pieces = pieces
         }
     }
 
-    private let playlist: Playlist?
+    private let playlistId: UUID?
     private var tracks: [Track]?
-    private var viewItems: [PlaylistViewItem] {
+
+    private var playlist: Playlist? {
+        playlistId.flatMap { model.musicLibrary.playlists[$0] }
+    }
+
+    private var pieces: [MusicPiece] {
         if let playlist {
             return playlist.items.map {
-                let track = model.musicLibrary.getTrack(by: $0.trackId)!
-                let album = model.musicLibrary.getAlbum(by: track.albumId)!
-                return PlaylistViewItem(track: track, album: album, playlistItem: $0, playlist: playlist)
+                MusicPiece($0, musicLibrary: model.musicLibrary)
             }
         } else {
             return tracks!.map {
-                PlaylistViewItem(
-                    track: $0,
-                    album: model.musicLibrary.getAlbum(by: $0.albumId)!,
-                    playlistItem: nil,
-                    playlist: nil
-                )
+                MusicPiece($0, musicLibrary: model.musicLibrary)
             }
         }
     }
-    private var sections: [SectionItem] {
-        var sections = [SectionItem]()
-        for item in viewItems {
-            if sections.last?.album.id == item.album.id {
-                sections[sections.count - 1].items.append(item)
+
+    private var sections: [AlbumSection] {
+        var sections = [AlbumSection]()
+        for piece in pieces {
+            if sections.last?.album == piece.album {
+                sections[sections.count - 1].pieces.append(piece)
             } else {
-                sections.append(SectionItem(album: item.album, items: [item]))
+                sections.append(AlbumSection(pieces: [piece]))
             }
         }
         return sections
     }
-    private var selectedViewItem: PlaylistViewItem? {
-        guard let (list, item) = windowModel.selectedItem.flatMap({ model.musicLibrary.locatePlaylistItem(by: $0) }) else {
-            return nil
-        }
-        guard list == playlist else {
-            return nil
-        }
-        let track = model.musicLibrary.getTrack(by: item.trackId)!
-        let album = model.musicLibrary.getAlbum(by: track.albumId)!
-        return PlaylistViewItem(track: track, album: album, playlistItem: item, playlist: list)
-    }
-    @State private var selectedViewItemAnimated: PlaylistViewItem?
+
+    @State private var selectedPiece: MusicPiece?
 
     init(tracks: [Track]) {
         self.tracks = tracks
-        self.playlist = nil
+        self.playlistId = nil
     }
 
-    init(_ playlist: Playlist) {
+    init(_ playlistId: UUID) {
         self.tracks = nil
-        self.playlist = playlist
+        self.playlistId = playlistId
     }
 
     var body: some View {
         HStack(spacing: 0) {
-            List(sections) { section in
-                let items = section.items
-                Section(items.first!.combinedAlbumTitle ?? "<No Title>") {
-                    ForEach(items) { item in
-                        PlaylistItemView(item)
+            List {
+                ForEach(sections) { section in
+                    Section(section.title) {
+                        ForEach(section.pieces) { piece in
+                            MusicPieceView(piece)
+                        }
                     }
                 }
             }
-            if let selectedViewItemAnimated {
+            if let selectedPiece {
                 Divider()
-                MetadataView(selectedViewItemAnimated)
+                MetadataView(selectedPiece)
             }
         }
-        .onChange(of: selectedViewItem) { selectedViewItem in
-            withAnimation {
-                selectedViewItemAnimated = selectedViewItem
-            }
+        .onAnimatedValue(of: windowModel.selectedPiece) {
+            selectedPiece = $0.flatMap { $0.playlistId == playlistId ? $0 : nil }
         }
     }
 }
@@ -367,14 +268,14 @@ fileprivate struct MetadataItemView: View {
 fileprivate struct MetadataView: View {
     @EnvironmentObject private var model: AppModel
 
-    private let viewItem: PlaylistViewItem
+    private let piece: MusicPiece
     private var coverData: Data? {
-        viewItem.album.cover
+        piece.album?.cover
     }
     @State private var coverImage: CGImage?
 
-    init(_ viewItem: PlaylistViewItem) {
-        self.viewItem = viewItem
+    init(_ piece: MusicPiece) {
+        self.piece = piece
     }
 
     var body: some View {
@@ -402,43 +303,43 @@ fileprivate struct MetadataView: View {
                 }
                 ScrollView {
                     VStack(spacing: 5) {
-                        if let title = viewItem.title {
+                        if let title = piece.title {
                             MetadataItemView(label: "Title", text: title)
                         }
-                        if let album = viewItem.albumTitle {
+                        if let album = piece.albumTitle {
                             MetadataItemView(label: "Album", text: album)
                         }
-                        let artists = viewItem.artists
+                        let artists = piece.artists
                         if !artists.isEmpty {
                             let artistLabel = artists.count > 1 ? "Artists" : "Artist"
                             MetadataItemView(label: artistLabel, text: artists.joined(separator: "\n"))
                         }
-                        let albumArtists = viewItem.albumArtists
+                        let albumArtists = piece.albumArtists
                         if !albumArtists.isEmpty && artists != albumArtists {
                             let artistLabel = albumArtists.count > 1 ? "Artists" : "Artist"
                             MetadataItemView(label: "Album " + artistLabel, text: albumArtists.joined(separator: "\n"))
                         }
-                        if let discNumber = viewItem.discNumber {
+                        if let discNumber = piece.discNumber {
                             MetadataItemView(label: "Disc Number", text: "\(discNumber)")
                         }
-                        if let trackNumber = viewItem.trackNumber {
+                        if let trackNumber = piece.trackNumber {
                             MetadataItemView(label: "Track Number", text: "\(trackNumber)")
                         }
-                        if let duration = viewItem.duration {
+                        if let duration = piece.durationString {
                             MetadataItemView(label: "Duration", text: duration)
                         }
                         // XXX: Add more field
-                        let isFile = viewItem.track.source.isFileURL
-                        MetadataItemView(
-                            label: isFile ? "File" : "URL",
-                            text: isFile ? viewItem.track.source.lastPathComponent : viewItem.track.source.description,
-                            scrollable: true,
-                            selectable: !isFile
-                        )
-                        .clickable(enabled: isFile)
-                        .onTapGesture {
-                            if isFile {
-                                NSWorkspace.shared.activateFileViewerSelecting([viewItem.track.source])
+                        if let track = piece.track {
+                            let isFile = track.source.isFileURL
+                            MetadataItemView(
+                                label: isFile ? "File" : "URL",
+                                text: isFile ? track.source.lastPathComponent : track.source.description,
+                                scrollable: true,
+                                selectable: !isFile
+                            )
+                            .clickable(enabled: isFile)
+                            .onTapGesture {
+                                NSWorkspace.shared.activateFileViewerSelecting([track.source])
                             }
                         }
                     }

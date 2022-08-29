@@ -141,6 +141,8 @@ fileprivate struct AlertView: View {
                 guard let window else { return }
                 if isPresent {
                     NSApp!.runModal(for: window)
+                } else {
+                    window.close()
                 }
             }
         }

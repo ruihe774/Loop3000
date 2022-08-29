@@ -324,8 +324,8 @@ struct Shelf: Codable {
                 if trackNumberR == nil { return true }
                 return trackNumberL! < trackNumberR!
             }
-            if $0.source.absoluteString != $1.source.absoluteString {
-                return $0.source.absoluteString < $1.source.absoluteString
+            if $0.source.normalizedString != $1.source.normalizedString {
+                return $0.source.normalizedString < $1.source.normalizedString
             }
             return $0.start < $1.start
         }
@@ -392,7 +392,7 @@ struct Shelf: Codable {
     func activate() {
         for logItem in discoverLog.items {
             guard let url = try? loadURLFromBookmark(logItem.bookmark) else { continue }
-            assert(url.absoluteURL == logItem.url.absoluteURL)
+            assert(url.normalizedURL == logItem.url.normalizedURL)
         }
     }
 }
@@ -437,7 +437,7 @@ struct DiscoverResult {
 fileprivate extension DiscoverLog {
     func needsRediscover(action: DiscoverLogItem.Action, url: URL) -> Bool {
         guard let logItem = items.first(where: {
-            return $0.url.absoluteURL == url.absoluteURL && (
+            return $0.url.normalizedURL == url.normalizedURL && (
                 $0.action == action || $0.action == .grabbing && action == .importing
             )
         }) else {
@@ -462,7 +462,7 @@ fileprivate extension DiscoverLog {
         }
         var pool = OrderedDictionary<Key, DiscoverLogItem>()
         for item in items + other.items {
-            let key = Key(action: item.action, url: item.url.absoluteURL)
+            let key = Key(action: item.action, url: item.url.normalizedURL)
             if let oitem = pool[key] {
                 if item.date < oitem.date {
                     continue
@@ -486,7 +486,7 @@ func discover(
         let fileManager = FileManager.default
         var children = Set(((try? fileManager.contentsOfDirectory(
             at: url, includingPropertiesForKeys: [.isDirectoryKey, .contentModificationDateKey], options: .skipsHiddenFiles
-        )) ?? []).map { $0.absoluteURL })
+        )) ?? []).map { $0.normalizedURL })
         for importer in mediaImporters {
             let applicableFiles = children.filter { $0.conformsAny(to: importer.supportedTypes) }
             await withTaskGroup(of: DiscoverResult.self) { taskGroup in
@@ -500,7 +500,7 @@ func discover(
                 }
             }
             children.subtract(applicableFiles)
-            children.subtract(r.tracks.map { $0.source.absoluteURL })
+            children.subtract(r.tracks.map { $0.source.normalizedURL })
         }
         if recursive {
             await withTaskGroup(of: DiscoverResult.self) { taskGroup in
@@ -536,7 +536,7 @@ func discover(
             r.errors.append(error)
             return r
         }
-        let sources = Set(tracks.map { $0.source.absoluteURL })
+        let sources = Set(tracks.map { $0.source.normalizedURL })
         var metadatas = [URL: Metadata]()
         await withTaskGroup(of: (source: URL, metadata: Metadata?, error: Error?).self) { taskGroup in
             for source in sources {
@@ -666,7 +666,7 @@ fileprivate func mergeShelf(_ a: Shelf, _ b: Shelf) -> Shelf {
 }
 
 fileprivate func mergeTracks(_ a: Track, _ b: Track) -> Track? {
-    guard a.source.absoluteURL == b.source.absoluteURL else { return nil }
+    guard a.source.normalizedURL == b.source.normalizedURL else { return nil }
     guard abs(a.start.value - b.start.value) < 500 || !a.start.isValid || !b.start.isValid else { return nil }
     guard abs(a.end.value - b.end.value) < 500 || !a.end.isValid || !b.end.isValid else { return nil }
     let durationA = a.start.isValid && a.end.isValid ? a.end.value - a.start.value : .max
@@ -891,7 +891,7 @@ fileprivate class CueSheetImporter: MediaImporter {
         tracks = tracks.filter { $0.start != .invalid }
         let sourcesNeedDuration = Set(tracks
             .filter { !$0.end.isValid }
-            .map { $0.source.absoluteURL }
+            .map { $0.source.normalizedURL }
         )
         let durations = try await withThrowingTaskGroup(of: (url: URL, duration: CueTime).self) { taskGroup in
             for source in sourcesNeedDuration {
@@ -913,7 +913,7 @@ fileprivate class CueSheetImporter: MediaImporter {
             .map {
                 var track = $0
                 if !track.end.isValid {
-                    track.end = durations[track.source.absoluteURL]!
+                    track.end = durations[track.source.normalizedURL]!
                 }
                 return track
             }

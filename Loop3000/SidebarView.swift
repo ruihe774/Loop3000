@@ -42,7 +42,7 @@ struct Sidebar: View {
                         }
                         .buttonStyle(.borderless)
                         .padding(2)
-                        .background(selected ? Color(nsColor: .quaternaryLabelColor) : .clear)
+                        .background(selected ? Color.selectedBackgroundColor : .clear)
                         .cornerRadius(8)
                     }
                 }

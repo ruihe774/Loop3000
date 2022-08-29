@@ -1,5 +1,4 @@
 import SwiftUI
-import Combine
 
 fileprivate struct ClickableModifier: ViewModifier {
     @State private var hovering = false
@@ -9,7 +8,7 @@ fileprivate struct ClickableModifier: ViewModifier {
         content
             .onHover { hover in withAnimation { hovering = hover } }
             .background(RoundedRectangle(cornerRadius: 3).fill(
-                hovering && enabled ? Color(nsColor: .quaternaryLabelColor).opacity(0.5) : .clear
+                hovering && enabled ? Color.interactiveBackgroundColor : .clear
             ))
     }
 
@@ -46,13 +45,13 @@ struct PlayerView: View {
             .font(.title2)
             .buttonStyle(.borderless)
             Button {
-                if model.playing {
+                if model.playbackState == .playing {
                     model.pause()
                 } else {
                     windowModel.resume()
                 }
             } label: {
-                (model.playing ? Label("Pause", systemImage: "pause.fill") : Label("Play", systemImage: "play.fill"))
+                (model.playbackState == .playing ? Label("Pause", systemImage: "pause.fill") : Label("Play", systemImage: "play.fill"))
                     .labelStyle(.iconOnly)
             }
             .font(.largeTitle)
@@ -71,11 +70,11 @@ struct PlayerView: View {
                 .font(.body.monospacedDigit())
             Slider(value: $sliderValue, in: 0 ... 1, onEditingChanged: { editing = $0 })
                 .onAppear {
-                    updateDuration(model.playingItem)
+                    updateDuration(model.playingPiece)
                     updateTimestamp(model.currentTimestamp)
                 }
-                .onChange(of: model.playingItem) { playingItem in
-                    updateDuration(playingItem)
+                .onChange(of: model.playingPiece) { playingPiece in
+                    updateDuration(playingPiece)
                     updateTimestamp(model.currentTimestamp)
                 }
                 .onReceive(model.refreshTimer) { _ in
@@ -86,27 +85,25 @@ struct PlayerView: View {
                         model.seek(to: targetTimestamp)
                     }
                 }
-                .disabled(!model.playing && !model.paused)
+                .disabled(model.playbackState == .stopped)
         }
         .frame(height: 27)
         .scenePadding([.leading, .trailing])
         .padding(.top, 32)
         .padding(.bottom, 28)
         .overlay {
-            if let (list, item) = model.playingItem.flatMap({ model.musicLibrary.locatePlaylistItem(by: $0) }) {
-                let track = model.musicLibrary.getTrack(by: item.trackId)!
-                let title = track.metadata[\.title] ?? track.source.lastPathComponent
+            if let piece = model.playingPiece, let title = piece.uiTitle {
                 HStack {
                     Spacer()
                     Button {
-                        windowModel.selectedList = list.id
-                        windowModel.selectedItem = item.id
+                        windowModel.selectedList = piece.playlistId
+                        windowModel.selectedPiece = piece
                     } label: {
                         Label(title, systemImage: "waveform")
                             .font(.caption)
                             .foregroundColor(.primary)
                             .padding(3)
-                            .clickable(enabled: windowModel.selectedList != list.id || windowModel.selectedItem != item.id)
+                            .clickable(enabled: windowModel.selectedList != piece.playlistId || windowModel.selectedPiece != piece)
                     }
                     .buttonStyle(.borderless)
                 }
@@ -117,12 +114,8 @@ struct PlayerView: View {
         }
     }
 
-    private func updateDuration(_ itemId: UUID?) {
-        if let track = itemId
-            .flatMap({ model.musicLibrary.locatePlaylistItem(by: $0)?.1 })
-            .flatMap({ model.musicLibrary.getTrack(by: $0.trackId) }) {
-            duration = track.end.value - track.start.value
-        }
+    private func updateDuration(_ piece: MusicPiece?) {
+        (piece?.duration?.value).map { duration = $0 }
     }
 
     private func updateTimestamp(_ timestamp: CueTime) {

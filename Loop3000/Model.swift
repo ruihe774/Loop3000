@@ -1,6 +1,5 @@
 import Foundation
 import AppKit
-import CoreGraphics
 import Combine
 import MediaPlayer
 import UniformTypeIdentifiers
@@ -21,12 +20,12 @@ fileprivate struct ObservableRequestTracer: RequestTracer {
 @MainActor
 class MusicLibrary: ObservableObject {
     @Published private var shelf = Shelf()
-    @Published private var albums: [UUID: Album] = [:]
-    @Published private var tracks: [UUID: Track] = [:]
-    @Published private(set) var manualPlaylists: [Playlist] = []
+    @Published private(set) var albums: [UUID: Album] = [:]
+    @Published private(set) var tracks: [UUID: Track] = [:]
     @Published private(set) var albumPlaylists: [Playlist] = []
+    @Published private(set) var manualPlaylists: [Playlist] = []
     @Published private(set) var playlists: [UUID: Playlist] = [:]
-    @Published private var playlistItemMap: [UUID: (Playlist, PlaylistItem)] = [:]
+    @Published private(set) var playlistItemLocation: [UUID: (Playlist, PlaylistItem)] = [:]
 
     @Published private(set) var importedAlbums: [Album] = []
     @Published private(set) var importedTracks: [Track] = []
@@ -36,30 +35,18 @@ class MusicLibrary: ObservableObject {
     private let queue = SerialAsyncQueue()
     private let tracer = ObservableRequestTracer(adding: PassthroughSubject(), removing: PassthroughSubject())
 
-    private var ac: [any Cancellable] = []
+    private var ac: [Cancellable] = []
     private var syncAc: Cancellable?
 
     init() {
         $shelf
             .map { $0.albums }
-            .map {
-                var d: [UUID: Album] = [:]
-                for album in $0 {
-                    d[album.id] = album
-                }
-                return d
-            }
+            .map { $0.makeDictionary() }
             .assign(to: &$albums)
 
         $shelf
             .map { $0.tracks }
-            .map {
-                var d: [UUID: Track] = [:]
-                for track in $0 {
-                    d[track.id] = track
-                }
-                return d
-            }
+            .map { $0.makeDictionary() }
             .assign(to: &$tracks)
 
         $shelf
@@ -85,36 +72,30 @@ class MusicLibrary: ObservableObject {
 
         Publishers.Zip($albumPlaylists, $manualPlaylists)
             .map { $0 + $1 }
-            .map {
-                var d: [UUID: Playlist] = [:]
-                for playlist in $0 {
-                    d[playlist.id] = playlist
-                }
-                return d
-            }
+            .map { $0.makeDictionary() }
             .assign(to: &$playlists)
 
         $playlists
             .map {
-                var d: [UUID: (Playlist, PlaylistItem)] = [:]
-                for playlist in $0.values {
-                    for item in playlist.items {
-                        d[item.id] = (playlist, item)
+                Dictionary(uniqueKeysWithValues: $0.values
+                    .flatMap { list in
+                        list.items.map { item in
+                            (item.id, (list, item))
+                        }
                     }
-                }
-                return d
+                )
             }
-            .assign(to: &$playlistItemMap)
+            .assign(to: &$playlistItemLocation)
 
         ac.append(tracer.adding
-            .receive(on: RunLoop.main)
+            .receiveOnMain()
             .sink { [unowned self] url in
                 requesting.append(url)
             }
         )
 
         ac.append(tracer.removing
-            .receive(on: RunLoop.main)
+            .receiveOnMain()
             .sink { [unowned self] url in
                 if let index = requesting.lastIndex(of: url) {
                     requesting.remove(at: index)
@@ -126,11 +107,11 @@ class MusicLibrary: ObservableObject {
     func performDiscover(at url: URL) {
         Task.detached {
             await self.queue.enqueue {
-                await MainActor.run {
+                let oldShelf = await MainActor.run {
                     self.processing = true
+                    return self.shelf
                 }
                 let (shelf, albums, tracks, errors) = await {
-                    let oldShelf = await self.shelf
                     let result = await discover(at: url, recursive: true, previousLog: oldShelf.discoverLog, tracer: self.tracer)
                     let albums = result.albums
                     let tracks = result.tracks
@@ -158,22 +139,6 @@ class MusicLibrary: ObservableObject {
         }
     }
 
-    func locatePlaylistItem(by itemId: UUID) -> (Playlist, PlaylistItem)? {
-        playlistItemMap[itemId]
-    }
-
-    func getTrack(by id: UUID) -> Track? {
-        tracks[id]
-    }
-
-    func getAlbum(by id: UUID) -> Album? {
-        albums[id]
-    }
-
-    func getPlaylist(by id: UUID) -> Playlist? {
-        playlists[id]
-    }
-
     func sorted(albums: [Album]) -> [Album] {
         shelf.sorted(albums: albums)
     }
@@ -195,14 +160,189 @@ class MusicLibrary: ObservableObject {
         }
         let syncQueue = DispatchQueue(label: "MusicLibrary.sync", qos: .utility)
         syncAc = $shelf
+            .receive(on: syncQueue)
             .sink { shelf in
-                syncQueue.async {
-                    let encoder = PropertyListEncoder()
-                    encoder.outputFormat = .binary
-                    let encoded = try! encoder.encode(shelf)
-                    try! encoded.write(to: shelfURL, options: [.atomic])
-                }
+                let encoder = PropertyListEncoder()
+                encoder.outputFormat = .binary
+                let encoded = try! encoder.encode(shelf)
+                try! encoded.write(to: shelfURL, options: [.atomic])
             }
+    }
+}
+
+@MainActor
+struct MusicPiece: EquatableIdentifiable, Hashable {
+    let id: UUID
+    unowned let musicLibrary: MusicLibrary
+
+    private enum ItemType {
+        case track
+        case playlistItem
+    }
+
+    private let type: ItemType
+
+    var playlistItemId: UUID? {
+        type == .playlistItem ? id : nil
+    }
+
+    var playlist: Playlist? {
+        playlistItemId
+            .flatMap { musicLibrary.playlistItemLocation[$0] }
+            .map { $0.0 }
+    }
+
+    var playlistId: UUID? {
+        playlist.map { $0.id }
+    }
+
+    var playlistItem: PlaylistItem? {
+        playlistItemId
+            .flatMap { musicLibrary.playlistItemLocation[$0] }
+            .map { $0.1 }
+    }
+
+    var trackId: UUID? {
+        switch type {
+        case .track: return id
+        case .playlistItem: return playlistItem?.trackId
+        }
+    }
+
+    var track: Track? {
+        trackId.flatMap { musicLibrary.tracks[$0] }
+    }
+
+    var albumId: UUID? {
+        track?.albumId
+    }
+
+    var album: Album? {
+        albumId.flatMap { musicLibrary.albums[$0] }
+    }
+
+    init(playlistItemId: UUID, musicLibrary library: MusicLibrary) {
+        id = playlistItemId
+        type = .playlistItem
+        musicLibrary = library
+    }
+
+    init(trackId: UUID, musicLibrary library: MusicLibrary) {
+        id = trackId
+        type = .track
+        musicLibrary = library
+    }
+
+    init(_ playlistItem: PlaylistItem, musicLibrary: MusicLibrary) {
+        self.init(playlistItemId: playlistItem.id, musicLibrary: musicLibrary)
+    }
+
+    init(_ track: Track, musicLibrary: MusicLibrary) {
+        self.init(trackId: track.id, musicLibrary: musicLibrary)
+    }
+
+    var title: String? {
+        track?.metadata[\.title]
+    }
+
+    var uiTitle: String {
+        title ?? track?.source.lastPathComponent ?? "<No Title>"
+    }
+
+    var artists: [String] {
+        let artistsString = track?.metadata[\.artist]
+            ?? album?.metadata[\.artist]
+            ?? ""
+        switch artistsString {
+        case "Various Artists", "V.A.", "VA":
+            return []
+        default:
+            return universalSplit(artistsString)
+        }
+    }
+
+    var trackNumber: Int? {
+        track?.metadata[\.trackNumber].flatMap { Int($0) }
+    }
+
+    var discNumber: Int? {
+        track?.metadata[\.discNumber].flatMap { Int($0) }
+    }
+
+    var indexString: String? {
+        guard let trackNumber = trackNumber else { return nil }
+        if let discNumber = discNumber {
+            return String(format: "%d.%02d", discNumber, trackNumber)
+        } else {
+            return String(format: "%02d", trackNumber)
+        }
+    }
+
+    var albumTitle: String? {
+        album?.metadata[\.title]
+    }
+
+    var albumArtists: [String] {
+        let artistsString = album?.metadata[\.artist] ?? ""
+        switch artistsString {
+        case "Various Artists", "V.A.", "VA":
+            return []
+        default:
+            return universalSplit(artistsString)
+        }
+    }
+
+    var combinedTitle: String {
+        if !artists.isEmpty && artists != albumArtists {
+            return uiTitle + " / " + artists.joined(separator: "; ")
+        } else {
+            return uiTitle
+        }
+    }
+
+    var combinedAlbumTitle: String? {
+        guard let albumTitle = albumTitle else { return nil }
+        if albumArtists.isEmpty {
+            return albumTitle
+        } else {
+            return albumTitle + " / " + albumArtists.joined(separator: "; ")
+        }
+    }
+
+    var duration: CueTime? {
+        track.flatMap { CueTime.difference($0.end, $0.start) }
+    }
+
+    var durationString: String? {
+        return duration?.shortDescription
+    }
+
+    var previous: MusicPiece? {
+        guard let list = playlist, let item = playlistItem else { return nil }
+        let index = list.items.firstIndex(of: item)!
+        guard index > 0 else { return nil }
+        return MusicPiece(list.items[index - 1], musicLibrary: musicLibrary)
+    }
+
+    var next: MusicPiece? {
+        guard let list = playlist, let item = playlistItem else { return nil }
+        let index = list.items.firstIndex(of: item)!
+        guard index < list.items.count - 1 else { return nil }
+        return MusicPiece(list.items[index + 1], musicLibrary: musicLibrary)
+    }
+
+    nonisolated func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+}
+
+extension CueTime {
+    func toSeconds() -> Double {
+        Double(value) / Double(Self.timescale)
+    }
+
+    init(seconds: Double) {
+        self.init(value: Int(seconds * Double(Self.timescale)))
     }
 }
 
@@ -213,9 +353,15 @@ struct AlertModel {
 }
 
 enum ShowView {
-    case Discover
-    case Playlist
-    case Stub
+    case discover
+    case playlist
+    case stub
+}
+
+enum PlaybackState {
+    case playing
+    case paused
+    case stopped
 }
 
 @MainActor
@@ -225,24 +371,23 @@ class AppModel: ObservableObject {
     @Published private(set) var musicLibrary = MusicLibrary()
     @Published var alertModel = AlertModel()
 
-    @Published private(set) var playingItem: UUID?
-    @Published private(set) var playing = false
-    @Published private(set) var paused = false
-
+    @Published private(set) var playingPiece: MusicPiece?
+    @Published private(set) var playbackState = PlaybackState.stopped
     fileprivate var player = PlaybackScheduler()
     var currentTimestamp: CueTime {
         player.currentTimestamp
     }
+    let refreshTimer = Timer.publish(every: 0.25, on: .main, in: .default)
+        .autoconnect()
+        .share()
+
     private var nowPlayingCenter: MPNowPlayingInfoCenter { MPNowPlayingInfoCenter.default() }
     private var remoteControlCenter: MPRemoteCommandCenter { MPRemoteCommandCenter.shared() }
     private var remoteControlInitialized = false
     private var coverData: Data?
     private var coverImage: CGImage?
-    let refreshTimer = Timer.publish(every: 0.25, on: .main, in: .default)
-        .autoconnect()
-        .share()
 
-    private var ac: [any Cancellable] = []
+    private var ac: [Cancellable] = []
 
     init() {
         ac.append(musicLibrary
@@ -250,25 +395,30 @@ class AppModel: ObservableObject {
             .sink { [unowned self] _ in objectWillChange.send() }
         )
 
-        $playing
-            .compactMap { $0 ? false : nil }
-            .assign(to: &$paused)
-
         player.requestNextHandler = { [unowned self] track in
-            guard let (list, item) = playingItem.flatMap({ musicLibrary.locatePlaylistItem(by: $0) }) else {
-                return nil
+            var nextTrack: Track?
+            DispatchQueue.main.sync {
+                nextTrack = {
+                    guard let playingPiece else {
+                        return nil
+                    }
+                    guard let list = playingPiece.playlist, let item = playingPiece.playlistItem else {
+                        return playingPiece.track
+                    }
+                    guard let track else {
+                        return playingPiece.track
+                    }
+                    let index = list.items.firstIndex(of: item)!
+                    guard let prevIndex = list.items[index...].firstIndex(where: { $0.trackId == track.id }) else {
+                        return nil
+                    }
+                    guard prevIndex < list.items.count - 1 else {
+                        return nil
+                    }
+                    return musicLibrary.tracks[list.items[prevIndex + 1].trackId]
+                }()
             }
-            guard let track else {
-                return musicLibrary.getTrack(by: item.trackId)
-            }
-            let index = list.items.firstIndex(of: item)!
-            guard let prevIndex = list.items[index...].firstIndex(where: { $0.trackId == track.id }) else {
-                return nil
-            }
-            guard prevIndex < list.items.count - 1 else {
-                return nil
-            }
-            return musicLibrary.getTrack(by: list.items[prevIndex + 1].trackId)
+            return nextTrack
         }
 
         player.errorHandler = { [unowned self] error in
@@ -280,73 +430,67 @@ class AppModel: ObservableObject {
         var tick = 0
         ac.append(refreshTimer
             .sink { [unowned self] _ in
-                if playing != player.playing {
-                    playing = player.playing
-                    if !playing && player.currentTrack == nil && playingItem != nil {
-                        playingItem = nil
-                    }
+                switch (playbackState, player.playing) {
+                case (.playing, false): playbackState = .stopped
+                case (.stopped, true), (.paused, true): playbackState = .playing
+                default: ()
                 }
-                guard playing else { return }
+                if playbackState == .stopped && player.currentTrack == nil && playingPiece != nil {
+                    playingPiece = nil
+                }
+                guard playbackState == .playing else { return }
                 tick += 1
                 if tick % 20 == 0 {
                     updateNowPlayingElapsedPlaybackTime()
                 }
-                guard let currentTrack = player.currentTrack else {
+                guard let currentTrack = player.currentTrack, let playingPiece else {
                     return
                 }
-                guard let (list, item) = playingItem.flatMap({ musicLibrary.locatePlaylistItem(by: $0) }) else {
+                guard let list = playingPiece.playlist, let item = playingPiece.playlistItem else {
                     return
                 }
                 let index = list.items.firstIndex(of: item)!
-                guard let currentItem = list.items[index...].first(where: { $0.trackId == currentTrack.id })?.id else {
+                guard let currentItem = list.items[index...].first(where: { $0.trackId == currentTrack.id }) else {
                     return
                 }
-                if playingItem != currentItem {
-                    playingItem = currentItem
+                if playingPiece.playlistItem != currentItem {
+                    self.playingPiece = MusicPiece(currentItem, musicLibrary: musicLibrary)
                 }
             }
         )
 
-        ac.append(Publishers.CombineLatest($playing, $paused)
-            .sink { [unowned self] (playing, paused) in
-                switch (playing, paused) {
-                case (true, false):
+        ac.append($playbackState
+            .sink { [unowned self] state in
+                switch state {
+                case .playing:
                     nowPlayingCenter.playbackState = .playing
-                    updateNowPlayingElapsedPlaybackTime()
-                case (false, true):
+                case .paused:
                     nowPlayingCenter.playbackState = .paused
-                    updateNowPlayingElapsedPlaybackTime()
-                case (false, false):
+                case .stopped:
                     nowPlayingCenter.playbackState = .stopped
-                default:
-                    ()
                 }
                 initRemoteControl()
+                updateNowPlayingElapsedPlaybackTime()
             }
         )
 
-        ac.append($playingItem.sink { [unowned self] playingItem in
-            if let playingItem {
-                guard let (_, item) = musicLibrary.locatePlaylistItem(by: playingItem) else { return }
-                let track = musicLibrary.getTrack(by: item.trackId)!
-                let album = musicLibrary.getAlbum(by: track.albumId)!
-                if album.cover != coverData {
-                    coverData = album.cover
+        ac.append($playingPiece.sink { [unowned self] playingPiece in
+            if let playingPiece {
+                if playingPiece.album?.cover != coverData {
+                    coverData = playingPiece.album?.cover
                     coverImage = coverData.map { loadImage(from: $0) }
                 }
                 nowPlayingCenter.nowPlayingInfo = [
-                    MPMediaItemPropertyPlaybackDuration: Double(track.end.value - track.start.value) / Double(CueTime.timescale),
+                    MPMediaItemPropertyPlaybackDuration: playingPiece.duration?.toSeconds() as Any,
                     MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.audio.rawValue,
-                    MPNowPlayingInfoPropertyAssetURL: track.source,
+                    MPNowPlayingInfoPropertyAssetURL: playingPiece.track?.source as Any,
                     MPNowPlayingInfoPropertyElapsedPlaybackTime: 0.0,
                     MPNowPlayingInfoPropertyPlaybackRate: 1.0,
                     MPNowPlayingInfoPropertyDefaultPlaybackRate: 1.0,
                     MPNowPlayingInfoPropertyIsLiveStream: false,
-                    MPMediaItemPropertyTitle: track.metadata[\.title] ?? track.source.lastPathComponent,
-                    MPMediaItemPropertyArtist:
-                        (track.metadata[\.artist] ?? album.metadata[\.artist])
-                            .map({ universalSplit($0).joined(separator: "; ") }) as Any,
-                    MPMediaItemPropertyAlbumTitle: album.metadata[\.title] as Any,
+                    MPMediaItemPropertyTitle: playingPiece.uiTitle,
+                    MPMediaItemPropertyArtist: (playingPiece.artists.isEmpty ? nil : playingPiece.artists.joined(separator: ";")) as Any,
+                    MPMediaItemPropertyAlbumTitle: playingPiece.albumTitle as Any,
                     MPMediaItemPropertyArtwork: coverImage.map({ coverImage in
                         MPMediaItemArtwork(
                             boundsSize: CGSize(width: Double(coverImage.width), height: Double(coverImage.height))
@@ -368,35 +512,33 @@ class AppModel: ObservableObject {
         alertModel.isPresented = true
     }
 
-    func play(_ itemId: UUID) {
-        playingItem = itemId
+    func play(_ piece: MusicPiece) {
+        playingPiece = piece
         player.stop()
         player.play()
     }
 
     private func resume() {
-        if playingItem != nil {
+        if playingPiece != nil {
             player.play()
         }
     }
 
     func pause() {
-        paused = true
+        playbackState = .paused
         player.pause()
     }
 
     func playPrevious() {
-        guard let (list, item) = playingItem.flatMap({ musicLibrary.locatePlaylistItem(by: $0) }) else { return }
-        let index = list.items.firstIndex(of: item)!
-        guard index > 0 else { return }
-        play(list.items[index - 1].id)
+        playingPiece
+            .flatMap { $0.previous }
+            .map { play($0) }
     }
 
     func playNext() {
-        guard let (list, item) = playingItem.flatMap({ musicLibrary.locatePlaylistItem(by: $0) }) else { return }
-        let index = list.items.firstIndex(of: item)!
-        guard index < list.items.count - 1 else { return }
-        play(list.items[index + 1].id)
+        playingPiece
+            .flatMap { $0.next }
+            .map { play($0) }
     }
 
     func seek(to time: CueTime) {
@@ -416,7 +558,7 @@ class AppModel: ObservableObject {
         }
         remoteControlCenter.togglePlayPauseCommand.addTarget { [weak self] _ in
             guard let self else { return .success }
-            if self.playing {
+            if self.playbackState == .playing {
                 self.pause()
             } else {
                 self.resume()
@@ -433,29 +575,29 @@ class AppModel: ObservableObject {
         }
         remoteControlCenter.changePlaybackPositionCommand.addTarget { [weak self] event in
             let seekEvent = event as! MPChangePlaybackPositionCommandEvent
-            self?.seek(to: CueTime(value: Int(seekEvent.positionTime * Double(CueTime.timescale))))
+            self?.seek(to: CueTime(seconds: seekEvent.positionTime))
             return .success
         }
         remoteControlInitialized = true
     }
 
     func updateNowPlayingElapsedPlaybackTime() {
-        nowPlayingCenter.nowPlayingInfo?[MPNowPlayingInfoPropertyElapsedPlaybackTime] =
-            Double(player.currentTimestamp.value) / Double(CueTime.timescale)
+        nowPlayingCenter.nowPlayingInfo?[MPNowPlayingInfoPropertyElapsedPlaybackTime] = player.currentTimestamp.toSeconds()
     }
 }
 
 @MainActor
 class WindowModel: ObservableObject {
-    @Published private(set) var currentView = ShowView.Stub
+    @Published private(set) var currentView = ShowView.stub
     @Published private(set) var previousView: ShowView?
 
     @Published var selectedList: UUID?
-    @Published var selectedItem: UUID?
+    @Published var selectedPiece: MusicPiece?
+    @Published var selectedPieces: Set<MusicPiece> = []
 
     unowned let appModel: AppModel
 
-    private var ac: [any Cancellable] = []
+    private var ac: [Cancellable] = []
 
     init(appModel: AppModel) {
         self.appModel = appModel
@@ -468,21 +610,28 @@ class WindowModel: ObservableObject {
             .assign(to: &$previousView)
 
         appModel.musicLibrary.$processing
-            .compactMap { $0 ? .Discover : nil }
+            .compactMap { $0 ? .discover : nil }
             .assign(to: &$currentView)
 
         $selectedList
-            .compactMap { $0.map { _ in .Playlist } }
+            .compactMap { $0.map { _ in .playlist } }
             .assign(to: &$currentView)
 
-        appModel.$playingItem
-            .compactMap { [unowned self] playingItem in
-                guard let playingItem else { return nil }
-                guard let (list, _) = appModel.musicLibrary.locatePlaylistItem(by: playingItem) else { return nil }
-                guard list.id == selectedList else { return nil }
-                return playingItem
+        appModel.$playingPiece
+            .compactMap { [unowned self] playingPiece -> MusicPiece? in
+                guard playingPiece?.playlistId == selectedList else { return nil }
+                return playingPiece
             }
-            .assign(to: &$selectedItem)
+            .assign(to: &$selectedPiece)
+
+        $selectedPiece
+            .compactMap { $0.map { _ in [] } }
+            .assign(to: &$selectedPieces)
+
+        $selectedPieces
+            .compactMap { $0.isEmpty ? nil : true }
+            .map { _ in nil }
+            .assign(to: &$selectedPiece)
     }
 
     func switchToPreviousView() {
@@ -491,13 +640,13 @@ class WindowModel: ObservableObject {
     }
 
     func resume() {
-        if appModel.playingItem != nil {
+        if appModel.playingPiece != nil {
             appModel.player.play()
         } else {
             selectedList
-                .flatMap { appModel.musicLibrary.getPlaylist(by: $0) }
+                .flatMap { appModel.musicLibrary.playlists[$0] }
                 .flatMap { $0.items.first }
-                .map { appModel.play($0.id) }
+                .map { appModel.play(MusicPiece($0, musicLibrary: appModel.musicLibrary)) }
         }
     }
 }
