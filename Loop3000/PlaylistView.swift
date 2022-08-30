@@ -13,7 +13,7 @@ fileprivate struct MusicPieceView: View {
     }
 
     private var currentPlaying: Bool {
-        model.playingPiece == piece && model.playbackState == .playing
+        return model.playingPiece == piece && model.playbackState == .playing
     }
 
     private var currentPaused: Bool {
@@ -25,9 +25,15 @@ fileprivate struct MusicPieceView: View {
     }
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 5)
-                .fill(selected ? Color.selectedBackgroundColor : Color.black.opacity(0.001))
+        Button {
+            let now = DispatchTime.now()
+            if now.uptimeNanoseconds - lastTap.uptimeNanoseconds < 300000000 {
+                model.play(piece)
+            } else {
+                windowModel.selectedPiece = piece
+            }
+            lastTap = now
+        } label: {
             HStack {
                 (currentPlaying || currentPaused ?
                     Label(currentPaused ? "Paused" : "Playing", systemImage: currentPaused ? "pause.fill" : "play.fill")
@@ -51,15 +57,10 @@ fileprivate struct MusicPieceView: View {
             .padding(.leading, 10)
             .padding(.trailing, 30)
         }
-        .onTapGesture {
-            let now = DispatchTime.now()
-            if now.uptimeNanoseconds - lastTap.uptimeNanoseconds < 300000000 {
-                model.play(piece)
-            } else {
-                windowModel.selectedPiece = piece
-            }
-            lastTap = now
-        }
+        .buttonStyle(.borderless)
+        .background(RoundedRectangle(cornerRadius: 5)
+            .fill(selected ? Color.selectedBackgroundColor : .clear))
+        .foregroundColor(.primary)
     }
 }
 
@@ -132,15 +133,26 @@ struct PlaylistView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            List {
-                ForEach(sections) { section in
-                    Section(section.title) {
-                        ForEach(section.pieces) { piece in
+            ScrollView {
+                VStack {
+                    ForEach(pieces) { piece in
+                        if let section = sections.first(where: { $0.pieces.first! == piece }) {
+                            MusicPieceView(piece)
+                                .padding(.top, 30)
+                                .overlay(alignment: .topLeading) {
+                                    Text(section.title)
+                                        .font(.subheadline.bold())
+                                        .foregroundColor(.secondary)
+                                        .frame(height: 30)
+                                }
+                        } else {
                             MusicPieceView(piece)
                         }
                     }
                 }
+                .padding([.leading, .trailing, .bottom])
             }
+            .background(.background)
             if let selectedPiece {
                 Divider()
                 MetadataView(selectedPiece)
