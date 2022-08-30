@@ -403,7 +403,7 @@ class AppModel: ObservableObject {
 
         player.requestNextHandler = { [unowned self] track in
             var nextTrack: Track?
-            DispatchQueue.main.sync {
+//            DispatchQueue.main.sync {
                 nextTrack = {
                     guard let playingPiece else {
                         return nil
@@ -423,7 +423,7 @@ class AppModel: ObservableObject {
                     }
                     return musicLibrary.tracks[list.items[prevIndex + 1].trackId]
                 }()
-            }
+//            }
             return nextTrack
         }
 
@@ -437,12 +437,13 @@ class AppModel: ObservableObject {
         ac.append(refreshTimer
             .sink { [unowned self] _ in
                 switch (playbackState, player.playing) {
-                case (.playing, false): playbackState = .stopped
+                case (.playing, false):
+                    playbackState = .stopped
+                    if player.currentTrack == nil && playingPiece != nil {
+                        playingPiece = nil
+                    }
                 case (.stopped, true), (.paused, true): playbackState = .playing
                 default: ()
-                }
-                if playbackState == .stopped && player.currentTrack == nil && playingPiece != nil {
-                    playingPiece = nil
                 }
                 guard playbackState == .playing else { return }
                 tick += 1
