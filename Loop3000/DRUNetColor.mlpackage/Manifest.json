@@ -7,6 +7,12 @@
             "name": "weights",
             "path": "com.apple.CoreML/weights"
         },
+        "F614C006-AC9E-42E6-86A6-0B812611041A": {
+            "author": "com.apple.CoreML",
+            "description": "External Metadata Overlay",
+            "name": "Metadata.json",
+            "path": "com.apple.CoreML/Metadata.json"
+        },
         "fbb607c2-7b27-4e1c-9ab2-fe71da85a4c6": {
             "author": "com.apple.CoreML",
             "description": "CoreML Model Specification",
