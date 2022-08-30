@@ -105,6 +105,9 @@ class MusicLibrary: ObservableObject {
     }
 
     func performDiscover(at url: URL) {
+        DispatchQueue.global(qos: .utility).async {
+            let _ = Scaler.shared()
+        }
         Task.detached {
             await self.queue.enqueue {
                 let oldShelf = await MainActor.run {

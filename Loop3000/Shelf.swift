@@ -1049,8 +1049,6 @@ protocol ArtworkLoader {
 
 var artworkLoaders: [any ArtworkLoader] = [CGArtworkLoader()]
 
-fileprivate let scaler = Scaler()
-
 func loadImage(from data: Data) -> CGImage {
     let source = CGImageSourceCreateWithData(data as CFData, nil)!
     let image = CGImageSourceCreateImageAtIndex(source, 0, nil)!
@@ -1085,6 +1083,7 @@ extension Shelf {
     }
 
     mutating func loadAllArtworks(tracer: RequestTracer? = nil) async -> [Error] {
+        let scaler = Scaler.shared()
         let (images, errors) = await withTaskGroup(of: (Album, CGImage?, Error?).self) { taskGroup in
             for album in albums {
                 if album.cover == nil {
@@ -1107,9 +1106,12 @@ extension Shelf {
             return (images, errors)
         }
         let originalImages = images.map { $0.1 }
-        let scaledImages = await scaler.scale(images: originalImages.map { CIImage(cgImage: $0) }, to: originalImages.map { image in
+        let scaledImages = await scaler.scaleAndDenoise(images: originalImages.map { CIImage(cgImage: $0) }, to: originalImages.map { image in
             let newWidth = 600
-            let newHeight = image.height * 600 / image.width
+            var newHeight = image.height * 600 / image.width
+            if newHeight >= 595 && newHeight <= 605 {
+                newHeight = 600
+            }
             return Scaler.Resolution(width: newWidth, height: newHeight)
         })
         let cictx = scaler.cictx

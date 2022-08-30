@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		6604F69F28A90F4400B84549 /* PlaylistView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6604F69E28A90F4400B84549 /* PlaylistView.swift */; };
 		6604F6A128A92BF900B84549 /* PlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6604F6A028A92BF900B84549 /* PlayerView.swift */; };
+		6613203C28BDA53100BEF1A8 /* DRUNetColor.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 6613203B28BDA53100BEF1A8 /* DRUNetColor.mlpackage */; };
 		661B751628A47C9900B9C012 /* Shelf.swift in Sources */ = {isa = PBXBuildFile; fileRef = 661B751528A47C9800B9C012 /* Shelf.swift */; };
 		662C8AC028AF8C5C003983FE /* Util.swift in Sources */ = {isa = PBXBuildFile; fileRef = 662C8ABF28AF8C5C003983FE /* Util.swift */; };
 		66684C7628A7C28800C32BC8 /* Model.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66684C7528A7C28800C32BC8 /* Model.swift */; };
@@ -27,6 +28,7 @@
 /* Begin PBXFileReference section */
 		6604F69E28A90F4400B84549 /* PlaylistView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistView.swift; sourceTree = "<group>"; };
 		6604F6A028A92BF900B84549 /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
+		6613203B28BDA53100BEF1A8 /* DRUNetColor.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = DRUNetColor.mlpackage; sourceTree = "<group>"; };
 		661B751528A47C9800B9C012 /* Shelf.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Shelf.swift; sourceTree = "<group>"; };
 		662C8ABF28AF8C5C003983FE /* Util.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Util.swift; sourceTree = "<group>"; };
 		66684C7528A7C28800C32BC8 /* Model.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Model.swift; sourceTree = "<group>"; };
@@ -103,6 +105,7 @@
 				662C8ABF28AF8C5C003983FE /* Util.swift */,
 				666A2C2B28B4CC66006172A5 /* Scaler.swift */,
 				666BD94928B04269006E0408 /* Bridge.h */,
+				6613203B28BDA53100BEF1A8 /* DRUNetColor.mlpackage */,
 			);
 			path = Loop3000;
 			sourceTree = "<group>";
@@ -188,6 +191,7 @@
 				66684C7628A7C28800C32BC8 /* Model.swift in Sources */,
 				6604F69F28A90F4400B84549 /* PlaylistView.swift in Sources */,
 				669C586328A47B4D0038A986 /* MainView.swift in Sources */,
+				6613203C28BDA53100BEF1A8 /* DRUNetColor.mlpackage in Sources */,
 				661B751628A47C9900B9C012 /* Shelf.swift in Sources */,
 				669C586128A47B4D0038A986 /* App.swift in Sources */,
 				662C8AC028AF8C5C003983FE /* Util.swift in Sources */,
