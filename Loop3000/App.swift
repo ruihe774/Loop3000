@@ -64,6 +64,9 @@ fileprivate struct Loop3000App: App {
                 openWindow(id: "alert")
             }
         }
+        .onChange(of: showDiscoverer) { showDiscoverer in
+            model.musicLibrary.prepareDiscover()
+        }
         .windowResizability(.contentSize)
         .commandsRemoved()
     }

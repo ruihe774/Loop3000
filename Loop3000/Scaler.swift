@@ -32,6 +32,7 @@ class Scaler {
     }
 
     func scaleAndDenoise(images: [CIImage], to sizes: [Resolution]) async -> [CIImage] {
+        guard !images.isEmpty else { return [] }
         let scaledBuffers = await withCheckedContinuation { continuation in
             var scalers: [MTLFXSpatialScalerDescriptor: MTLFXSpatialScaler] = [:]
             func getSpatialScaler(for desc: MTLFXSpatialScalerDescriptor) -> MTLFXSpatialScaler {
