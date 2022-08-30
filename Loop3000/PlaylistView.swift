@@ -134,7 +134,7 @@ struct PlaylistView: View {
     var body: some View {
         HStack(spacing: 0) {
             ScrollView {
-                VStack {
+                LazyVStack {
                     ForEach(pieces) { piece in
                         if let section = sections.first(where: { $0.pieces.first! == piece }) {
                             MusicPieceView(piece)

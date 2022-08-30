@@ -89,7 +89,7 @@ struct PlayerView: View {
                 }
                 .disabled(model.playbackState == .stopped)
         }
-        .frame(height: 27)
+        .frame(height: 25)
         .scenePadding([.leading, .trailing])
         .padding(.top, 32)
         .padding(.bottom, 28)

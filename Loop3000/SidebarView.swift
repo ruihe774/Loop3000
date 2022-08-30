@@ -9,6 +9,35 @@ fileprivate struct SidebarMaterial: NSViewRepresentable {
     func updateNSView(_: NSView, context _: Context) {}
 }
 
+fileprivate struct SidebarList: View {
+    @EnvironmentObject private var windowModel: WindowModel
+
+    let playlists: [Playlist]
+
+    var body: some View {
+        LazyVStack(spacing: -4) {
+            ForEach(playlists) { playlist in
+                let selected = windowModel.selectedList == playlist.id
+                Button {
+                    windowModel.selectedList = playlist.id
+                } label: {
+                    ScrollView(.horizontal) {
+                        Text(playlist.title)
+                            .help(playlist.title)
+                            .foregroundColor(.primary)
+                    }
+                    .scrollIndicators(.never)
+                    .padding(6)
+                }
+                .buttonStyle(.borderless)
+                .padding(2)
+                .background(selected ? Color.selectedBackgroundColor : .clear)
+                .cornerRadius(8)
+            }
+        }
+    }
+}
+
 struct Sidebar: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var windowModel: WindowModel
@@ -19,37 +48,46 @@ struct Sidebar: View {
     }
     @State private var listType = ListType.albums
 
+    @State private var filterString = ""
+
     var body: some View {
-        VStack(alignment: .center) {
-            Text("Loop3000")
-                .font(.headline)
+        VStack(spacing: 15) {
+            TextField(text: $filterString) {}
+                .padding(.leading, 23.5)
+                .overlay {
+                    HStack {
+                        Image(systemName: "magnifyingglass")
+                        filterString.isEmpty ? Text("Search") : nil
+                        Spacer()
+                    }
+                    .foregroundColor(.secondary)
+                }
+                .padding([.leading, .trailing], 10)
+                .frame(height: 30)
+                .textFieldStyle(.plain)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color(nsColor: .quaternaryLabelColor).opacity(0.5)))
+                .scenePadding([.leading, .trailing])
             ScrollView {
-                LazyVStack(spacing: -4) {
-                    ForEach(
-                        listType == .albums ? model.musicLibrary.albumPlaylists : model.musicLibrary.manualPlaylists
-                    ) { playlist in
-                        let selected = windowModel.selectedList == playlist.id
-                        Button {
-                            windowModel.selectedList = playlist.id
-                        } label: {
-                            ScrollView(.horizontal) {
-                                Text(playlist.title)
-                                    .help(playlist.title)
-                                    .foregroundColor(.primary)
-                            }
-                            .scrollIndicators(.never)
-                            .padding(6)
-                        }
-                        .buttonStyle(.borderless)
-                        .padding(2)
-                        .background(selected ? Color.selectedBackgroundColor : .clear)
-                        .cornerRadius(8)
+                VStack(alignment: .leading) {
+                    if !model.musicLibrary.manualPlaylists.isEmpty {
+                        Text("Playlists")
+                            .font(.subheadline.bold())
+                            .foregroundColor(.secondary)
+                            .padding(.bottom, -4)
+                        SidebarList(playlists: model.musicLibrary.manualPlaylists)
+                    }
+                    if !model.musicLibrary.albumPlaylists.isEmpty {
+                        Text("Albums")
+                            .font(.subheadline.bold())
+                            .foregroundColor(.secondary)
+                            .padding(.bottom, -4)
+                        SidebarList(playlists: model.musicLibrary.albumPlaylists)
                     }
                 }
+                .scenePadding([.leading, .trailing])
             }
             .scrollContentBackground(.hidden)
         }
-        .scenePadding([.leading, .trailing])
         .padding([.top, .bottom], 30)
         .frame(width: 250)
         .background(SidebarMaterial())
