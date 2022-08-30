@@ -567,7 +567,7 @@ func discover(
         }
         tracks = tracks.map {
             var track = $0
-            if let metadata = metadatas[track.source] {
+            if let metadata = metadatas[track.source.normalizedURL] {
                 track.metadata.merge(metadata) { (_, new) in new }
             }
             let albumTitle = track.metadata[\.album]
