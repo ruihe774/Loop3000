@@ -101,26 +101,24 @@ class Scaler {
             }
             cmdBuffer.commit()
         }
-        let denoisedBuffers = await withTaskGroup(of: (Int, CVPixelBuffer).self) { taskGroup in
-            let constraint = denoiser.model.modelDescription.inputDescriptionsByName["inputImage"]!.imageConstraint!
-            for (i, buffer) in scaledBuffers.enumerated() {
-                let width = CVPixelBufferGetWidth(buffer)
-                let height = CVPixelBufferGetHeight(buffer)
-                guard width == constraint.pixelsWide && height == constraint.pixelsHigh else { continue }
-                taskGroup.addTask {
-                    (i, await withCheckedContinuation { continuation in
-                        continuation.resume(returning: try! self.denoiser.prediction(
-                            inputImage: buffer,
-                            noiseLevel: MLMultiArray([7.65])
-                        ).outputImage)
-                    })
-                }
+        let constraint = denoiser.model.modelDescription.inputDescriptionsByName["inputImage"]!.imageConstraint!
+        var denoisedBuffers = scaledBuffers
+        let canDenoise = scaledBuffers
+            .enumerated()
+            .filter {
+                let width = CVPixelBufferGetWidth($1)
+                let height = CVPixelBufferGetHeight($1)
+                return width == constraint.pixelsWide && height == constraint.pixelsHigh
             }
-            var denoisedBuffers = scaledBuffers
-            for await (i, buffer) in taskGroup {
-                denoisedBuffers[i] = buffer
-            }
-            return denoisedBuffers
+        for (i, buffer) in zip(
+            canDenoise.map { $0.0 },
+            await withCheckedContinuation { continuation in DispatchQueue.global().async {
+                continuation.resume(returning: try! self.denoiser.predictions(
+                    inputs: canDenoise.map { DRUNetColorInput(inputImage: $1, noiseLevel: try! MLMultiArray([7.65])) }
+                ))
+            }}.map { $0.outputImage }
+        ) {
+            denoisedBuffers[i] = buffer
         }
         let outputImages = denoisedBuffers.map { buffer in
             CIImage(cvPixelBuffer: buffer, options: [.colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!])
