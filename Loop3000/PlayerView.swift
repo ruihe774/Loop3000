@@ -41,6 +41,7 @@ struct PlayerView: View {
             } label: {
                 Label("Play previous track", systemImage: "backward.fill")
                     .labelStyle(.iconOnly)
+                    .frame(width: 25, height: 25)
             }
             .font(.title2)
             .buttonStyle(.borderless)
@@ -53,15 +54,16 @@ struct PlayerView: View {
             } label: {
                 (model.playbackState == .playing ? Label("Pause", systemImage: "pause.fill") : Label("Play", systemImage: "play.fill"))
                     .labelStyle(.iconOnly)
+                    .frame(width: 25, height: 25)
             }
             .font(.largeTitle)
             .buttonStyle(.borderless)
-            .frame(width: 25)
             Button {
                 model.playNext()
             } label: {
                 Label("Play next track", systemImage: "forward.fill")
                     .labelStyle(.iconOnly)
+                    .frame(width: 25, height: 25)
             }
             .font(.title2)
             .buttonStyle(.borderless)
