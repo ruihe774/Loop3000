@@ -114,7 +114,7 @@ class Scaler {
             canDenoise.map { $0.0 },
             await withCheckedContinuation { continuation in DispatchQueue.global().async {
                 continuation.resume(returning: try! self.denoiser.predictions(
-                    inputs: canDenoise.map { DRUNetColorInput(inputImage: $1, noiseLevel: try! MLMultiArray([7.65])) }
+                    inputs: canDenoise.map { DRUNetColorInput(inputImage: $1, noiseLevel: try! MLMultiArray([Float(8)])) }
                 ))
             }}.map { $0.outputImage }
         ) {
