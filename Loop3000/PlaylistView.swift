@@ -141,7 +141,7 @@ struct PlaylistView: View {
                                 .padding(.top, 30)
                                 .overlay(alignment: .topLeading) {
                                     Text(section.title)
-                                        .font(.subheadline.bold())
+                                        .font(.callout.bold())
                                         .foregroundColor(.secondary)
                                         .frame(height: 30)
                                 }

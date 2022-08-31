@@ -72,14 +72,14 @@ struct Sidebar: View {
                 VStack(alignment: .leading) {
                     if !model.musicLibrary.manualPlaylists.isEmpty {
                         Text("Playlists")
-                            .font(.subheadline.bold())
+                            .font(.callout.bold())
                             .foregroundColor(.secondary)
                             .padding(.bottom, -4)
                         SidebarList(playlists: model.musicLibrary.manualPlaylists)
                     }
                     if !model.musicLibrary.albumPlaylists.isEmpty {
                         Text("Albums")
-                            .font(.subheadline.bold())
+                            .font(.callout.bold())
                             .foregroundColor(.secondary)
                             .padding(.bottom, -4)
                         SidebarList(playlists: model.musicLibrary.albumPlaylists)

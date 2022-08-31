@@ -92,7 +92,7 @@ struct PlayerView: View {
         .frame(height: 25)
         .scenePadding([.leading, .trailing])
         .padding(.top, 32)
-        .padding(.bottom, 28)
+        .padding(.bottom, 30)
         .overlay {
             if let piece = model.playingPiece, let title = piece.uiTitle {
                 HStack {
