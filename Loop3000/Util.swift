@@ -274,13 +274,15 @@ extension Color {
 }
 
 extension View {
-    func onAnimatedValue<T: Equatable>(of value: T, perform: @escaping (T) -> ()) -> some View {
+    func onAnimatedValue<T: Equatable>(of value: T, onAppear: Bool = true, perform: @escaping (T) -> ()) -> some View {
         self
             .onChange(of: value) { value in
                 withAnimation { perform(value) }
             }
             .onAppear {
-                perform(value)
+                if onAppear {
+                    perform(value)
+                }
             }
     }
 }

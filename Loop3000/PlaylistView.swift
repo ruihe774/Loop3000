@@ -161,6 +161,9 @@ struct PlaylistView: View {
         .onAnimatedValue(of: windowModel.selectedPiece) {
             selectedPiece = $0.flatMap { $0.playlistId == playlistId ? $0 : nil }
         }
+        .onAnimatedValue(of: playlistId, onAppear: false) { playlistId in
+            selectedPiece = windowModel.selectedPiece.flatMap { $0.playlistId == playlistId ? $0 : nil }
+        }
     }
 }
 
