@@ -67,6 +67,7 @@ struct Sidebar: View {
                 .textFieldStyle(.plain)
                 .background(RoundedRectangle(cornerRadius: 8).fill(Color(nsColor: .quaternaryLabelColor).opacity(0.5)))
                 .scenePadding([.leading, .trailing])
+                .disabled(true)
             ScrollView {
                 VStack(alignment: .leading) {
                     if !model.musicLibrary.manualPlaylists.isEmpty {
