@@ -24,6 +24,7 @@
 		669C586528A47B4E0038A986 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 669C586428A47B4E0038A986 /* Assets.xcassets */; };
 		66AE187A28B666AE00DE637A /* Collections in Frameworks */ = {isa = PBXBuildFile; productRef = 66AE187928B666AE00DE637A /* Collections */; };
 		66AE611728B41C6100F04DF5 /* Playback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66AE611628B41C6100F04DF5 /* Playback.swift */; };
+		66C0EB1728BFDEF500DDB219 /* Atomics in Frameworks */ = {isa = PBXBuildFile; productRef = 66C0EB1628BFDEF500DDB219 /* Atomics */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -57,6 +58,7 @@
 				66AE187A28B666AE00DE637A /* Collections in Frameworks */,
 				666BD94F28B04303006E0408 /* libogg.a in Frameworks */,
 				666BD95028B04303006E0408 /* libFLAC.a in Frameworks */,
+				66C0EB1728BFDEF500DDB219 /* Atomics in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -131,6 +133,7 @@
 			name = Loop3000;
 			packageProductDependencies = (
 				66AE187928B666AE00DE637A /* Collections */,
+				66C0EB1628BFDEF500DDB219 /* Atomics */,
 			);
 			productName = Loop3000;
 			productReference = 669C585D28A47B4D0038A986 /* Loop3000.app */;
@@ -163,6 +166,7 @@
 			mainGroup = 669C585428A47B4D0038A986;
 			packageReferences = (
 				66AE187828B666AE00DE637A /* XCRemoteSwiftPackageReference "swift-collections" */,
+				66C0EB1528BFDEF500DDB219 /* XCRemoteSwiftPackageReference "swift-atomics" */,
 			);
 			productRefGroup = 669C585E28A47B4D0038A986 /* Products */;
 			projectDirPath = "";
@@ -416,6 +420,14 @@
 				minimumVersion = 1.0.0;
 			};
 		};
+		66C0EB1528BFDEF500DDB219 /* XCRemoteSwiftPackageReference "swift-atomics" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-atomics.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -423,6 +435,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 66AE187828B666AE00DE637A /* XCRemoteSwiftPackageReference "swift-collections" */;
 			productName = Collections;
+		};
+		66C0EB1628BFDEF500DDB219 /* Atomics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 66C0EB1528BFDEF500DDB219 /* XCRemoteSwiftPackageReference "swift-atomics" */;
+			productName = Atomics;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

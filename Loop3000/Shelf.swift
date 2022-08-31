@@ -398,7 +398,7 @@ struct Shelf: Codable {
 }
 
 protocol RequestTracer {
-    func add(_ url: URL)
+    func add(_ url: URL) async
     func remove(_ url: URL)
 }
 
@@ -896,7 +896,7 @@ fileprivate class CueSheetImporter: MediaImporter {
         let durations = try await withThrowingTaskGroup(of: (url: URL, duration: CueTime).self) { taskGroup in
             for source in sourcesNeedDuration {
                 taskGroup.addTask {
-                    tracer?.add(url)
+                    await tracer?.add(url)
                     defer { tracer?.remove(url) }
                     let asset = AVAsset(url: source)
                     let duration = try await asset.load(.duration)
@@ -929,7 +929,7 @@ fileprivate class AVAssetImporter: MediaImporter {
     let supportedTypes = [UTType.audio]
 
     func importMedia(url: URL, tracer: RequestTracer?) async throws -> (albums: [Album], tracks: [Track]) {
-        tracer?.add(url)
+        await tracer?.add(url)
         defer { tracer?.remove(url) }
         let asset = AVAsset(url: url)
         let duration = try await asset.load(.duration)
@@ -974,7 +974,7 @@ fileprivate class FLACGrabber: MetadataGrabber {
     let supportedTypes = [UTType("org.xiph.flac")!]
 
     func grabMetadata(url: URL, tracer: RequestTracer?) async throws -> Metadata {
-        tracer?.add(url)
+        await tracer?.add(url)
         defer { tracer?.remove(url) }
         let invalid = InvalidFormat(url: url)
         var reader = DataReader(try readData(from: url))
@@ -1033,7 +1033,7 @@ fileprivate class AVAssetGrabber: MetadataGrabber {
     ]
 
     func grabMetadata(url: URL, tracer: RequestTracer?) async throws -> Metadata {
-        tracer?.add(url)
+        await tracer?.add(url)
         defer { tracer?.remove(url) }
         let asset = AVURLAsset(url: url)
         let avMetadata = try await asset.load(.metadata)
@@ -1151,7 +1151,7 @@ class CGImageArtworkLoader: ArtworkLoader {
     private let cictx = CIContext()
 
     func loadCover(from url: URL, tracer: RequestTracer? = nil) async throws -> CGImage? {
-        tracer?.add(url)
+        await tracer?.add(url)
         defer { tracer?.remove(url) }
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
         guard let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return nil }
@@ -1163,7 +1163,7 @@ class FLACArtworkLoader: ArtworkLoader {
     let supportedTypes = [UTType("org.xiph.flac")!]
 
     func loadCover(from url: URL, tracer: RequestTracer?) async throws -> CGImage? {
-        tracer?.add(url)
+        await tracer?.add(url)
         defer { tracer?.remove(url) }
         let invalid = InvalidFormat(url: url)
         var reader = DataReader(try readData(from: url))

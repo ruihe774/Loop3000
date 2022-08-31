@@ -3,18 +3,53 @@ import AppKit
 import Combine
 import MediaPlayer
 import UniformTypeIdentifiers
+import Atomics
 
 fileprivate struct ObservableRequestTracer: RequestTracer {
-    func add(_ url: URL) {
+    private var counter = ManagedAtomic<Int>(16)
+
+    private func tryAcquire() -> Bool {
+        let current = counter.load(ordering: .acquiring)
+        if current == 0 {
+            return false
+        }
+        return counter.compareExchange(
+            expected: current,
+            desired: current - 1,
+            successOrdering: .acquiring,
+            failureOrdering: .relaxed
+        ).exchanged
+    }
+
+    private func release() {
+        counter.wrappingIncrement(ordering: .releasing)
+    }
+
+    func add(_ url: URL) async {
+        var tick = 0
+        while !tryAcquire() {
+            if tick < 10 {
+                await Task.yield()
+            } else {
+                try! await Task.sleep(nanoseconds: 1000000)
+            }
+            tick += 1
+        }
         adding.send(url)
     }
 
     func remove(_ url: URL) {
+        release()
         removing.send(url)
     }
 
     var adding: PassthroughSubject<URL, Never>
     var removing: PassthroughSubject<URL, Never>
+
+    init(adding: PassthroughSubject<URL, Never>, removing: PassthroughSubject<URL, Never>) {
+        self.adding = adding
+        self.removing = removing
+    }
 }
 
 @MainActor
