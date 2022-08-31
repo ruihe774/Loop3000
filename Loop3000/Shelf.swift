@@ -944,6 +944,7 @@ fileprivate struct DataReader {
     private var position: Int
 
     mutating func read(count: Int) -> Data? {
+        guard count >= 0 else { return nil }
         guard position + count <= data.count else { return nil }
         let buffer = data[position ..< position + count]
         position += count
@@ -957,14 +958,20 @@ fileprivate struct DataReader {
     }
 }
 
+fileprivate func parse32bitIntLE(_ data: Data) -> Int {
+    let d = Data(data)
+    precondition(d.count == 4)
+    return Int(d[0]) | Int(d[1]) << 8 | Int(d[2]) << 16 | Int(d[3]) << 24
+}
+
+fileprivate func parse32bitIntBE(_ data: Data) ->  Int {
+    let d = Data(data)
+    precondition(d.count == 4)
+    return Int(d[3]) | Int(d[2]) << 8 | Int(d[1]) << 16 | Int(d[0]) << 24
+}
+
 fileprivate class FLACGrabber: MetadataGrabber {
     let supportedTypes = [UTType("org.xiph.flac")!]
-
-    private func parse32bitIntLE(_ data: Data) -> Int {
-        let d = Data(data)
-        precondition(d.count == 4)
-        return Int(d[0]) | Int(d[1] << 8) | Int(d[2] << 16) | Int(d[3] << 24)
-    }
 
     func grabMetadata(url: URL, tracer: RequestTracer?) async throws -> Metadata {
         tracer?.add(url)
@@ -1047,7 +1054,7 @@ protocol ArtworkLoader {
     func loadCover(from url: URL, tracer: RequestTracer?) async throws -> CGImage?
 }
 
-var artworkLoaders: [any ArtworkLoader] = [CGArtworkLoader()]
+var artworkLoaders: [any ArtworkLoader] = [CGImageArtworkLoader(), FLACArtworkLoader()]
 
 func loadImage(from data: Data) -> CGImage {
     let source = CGImageSourceCreateWithData(data as CFData, nil)!
@@ -1138,24 +1145,63 @@ extension Shelf {
     }
 }
 
-class CGArtworkLoader: ArtworkLoader {
-    let supportedTypes = [UTType.jpeg, UTType.png]
+class CGImageArtworkLoader: ArtworkLoader {
+    let supportedTypes = [UTType.image]
 
     private let cictx = CIContext()
 
     func loadCover(from url: URL, tracer: RequestTracer? = nil) async throws -> CGImage? {
         tracer?.add(url)
         defer { tracer?.remove(url) }
-        let type = UTType(filenameExtension: url.pathExtension)!
-        guard let dataProvider = CGDataProvider(url: url as CFURL) else {
-            throw FileNotFound(url: url)
-        }
-        guard let image = type.conforms(to: .jpeg)
-            ? CGImage(jpegDataProviderSource: dataProvider, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
-            : CGImage(pngDataProviderSource: dataProvider, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
-        else {
-            throw InvalidFormat(url: url)
-        }
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        guard let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return nil }
         return image
+    }
+}
+
+class FLACArtworkLoader: ArtworkLoader {
+    let supportedTypes = [UTType("org.xiph.flac")!]
+
+    func loadCover(from url: URL, tracer: RequestTracer?) async throws -> CGImage? {
+        tracer?.add(url)
+        defer { tracer?.remove(url) }
+        let invalid = InvalidFormat(url: url)
+        var reader = DataReader(try readData(from: url))
+        if reader.read(count: 4) != Data([0x66, 0x4C, 0x61, 0x43]) { throw invalid }
+        var last = false
+        repeat {
+            guard let header = reader.read(count: 4).map({ Data($0) }) else { throw invalid }
+            last = (header[0] >> 7) != 0
+            let type = header[0] & 0x7f
+            let length = Int(header[1]) << 16 | Int(header[2]) << 8 | Int(header[3])
+            switch type {
+            case 6: // PICTURE
+                guard let pictureType = reader.read(count: 4).map({ parse32bitIntBE($0) }) else { throw invalid }
+                if pictureType != 3 {
+                    guard reader.read(count: length - 4) != nil else { throw invalid }
+                } else {
+                    // Cover (front)
+                    guard let mimeLength = reader.read(count: 4).map({ parse32bitIntBE($0) }) else { throw invalid }
+                    guard let mime = reader.read(count: mimeLength)
+                        .flatMap({ String(data: $0, encoding: .ascii) })
+                    else { throw invalid }
+                    guard let descLength = reader.read(count: 4).map({ parse32bitIntBE($0) }) else { throw invalid }
+                    guard reader.read(count: descLength) != nil else { throw invalid }
+                    guard reader.read(count: 16) != nil else { throw invalid }
+                    guard let dataLength = reader.read(count: 4).map({ parse32bitIntBE($0) }) else { throw invalid }
+                    guard let imageData = reader.read(count: dataLength) else { throw invalid }
+                    guard 4 + 4 + mimeLength + 4 + descLength + 16 + 4 + dataLength == length else { throw invalid }
+                    guard let source = CGImageSourceCreateWithData(
+                        imageData as CFData,
+                        UTType(mimeType: mime).map({ [kCGImageSourceTypeIdentifierHint: $0.identifier] as CFDictionary })
+                    ) else { throw invalid }
+                    guard let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { throw invalid }
+                    return image
+                }
+            default:
+                guard reader.read(count: length) != nil else { throw invalid }
+            }
+        } while !last
+        return nil
     }
 }
