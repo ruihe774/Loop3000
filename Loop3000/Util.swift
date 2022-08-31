@@ -199,25 +199,28 @@ func loadURLFromBookmark(_ bookmark: Data) throws -> URL {
     return url
 }
 
-actor SerialAsyncQueue {
+@MainActor
+class SerialAsyncQueue {
     private var processing = false
     private var queue = Deque<() async -> ()>()
 
-    private func process() async {
-        guard !processing else { return }
+    private func processNext() {
+        assert(!processing)
+        guard let nextOperation = queue.popFirst() else { return }
         processing = true
-        while let operation = queue.popFirst() {
-            let _ = await Task.detached {
-                await operation()
-            }.result
+        Task.detached {
+            await nextOperation()
+            DispatchQueue.main.async {
+                self.processing = false
+                self.processNext()
+            }
         }
-        processing = false
     }
 
     func enqueue(_ operation: @Sendable @escaping () async -> ()) {
         queue.append(operation)
-        Task {
-            await process()
+        if !processing {
+            processNext()
         }
     }
 }

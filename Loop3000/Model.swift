@@ -105,36 +105,34 @@ class MusicLibrary: ObservableObject {
     }
 
     func performDiscover(at url: URL) {
-        Task.detached {
-            await self.queue.enqueue {
-                let oldShelf = await MainActor.run {
-                    self.processing = true
-                    return self.shelf
-                }
-                let (shelf, albums, tracks, errors) = await {
-                    let result = await discover(at: url, recursive: true, previousLog: oldShelf.discoverLog, tracer: self.tracer)
-                    let albums = result.albums
-                    let tracks = result.tracks
-                    let log = result.log
-                    var errors = result.errors
-                    var newShelf = oldShelf
-                    newShelf.merge(with: Shelf(albums: albums, tracks: tracks, discoverLog: log))
-                    newShelf.consolidateMetadata()
-                    errors.append(contentsOf: await newShelf.loadAllArtworks(tracer: self.tracer))
-                    return (
-                        newShelf,
-                        albums.compactMap { newShelf.albums.get(by: $0.id) },
-                        tracks.compactMap { newShelf.tracks.get(by: $0.id) },
-                        errors
-                    )
-                }()
-                await MainActor.run {
-                    self.shelf = shelf
-                    self.importedAlbums = albums
-                    self.importedTracks = tracks
-                    self.returnedErrors = errors
-                    self.processing = false
-                }
+        queue.enqueue {
+            let oldShelf = await MainActor.run {
+                self.processing = true
+                return self.shelf
+            }
+            let (shelf, albums, tracks, errors) = await {
+                let result = await discover(at: url, recursive: true, previousLog: oldShelf.discoverLog, tracer: self.tracer)
+                let albums = result.albums
+                let tracks = result.tracks
+                let log = result.log
+                var errors = result.errors
+                var newShelf = oldShelf
+                newShelf.merge(with: Shelf(albums: albums, tracks: tracks, discoverLog: log))
+                newShelf.consolidateMetadata()
+                errors.append(contentsOf: await newShelf.loadAllArtworks(tracer: self.tracer))
+                return (
+                    newShelf,
+                    albums.compactMap { newShelf.albums.get(by: $0.id) },
+                    tracks.compactMap { newShelf.tracks.get(by: $0.id) },
+                    errors
+                )
+            }()
+            await MainActor.run {
+                self.shelf = shelf
+                self.importedAlbums = albums
+                self.importedTracks = tracks
+                self.returnedErrors = errors
+                self.processing = false
             }
         }
     }
