@@ -18,6 +18,7 @@
 		666A2C2C28B4CC66006172A5 /* Scaler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 666A2C2B28B4CC66006172A5 /* Scaler.swift */; };
 		666BD94F28B04303006E0408 /* libogg.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 666BD94D28B04303006E0408 /* libogg.a */; };
 		666BD95028B04303006E0408 /* libFLAC.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 666BD94E28B04303006E0408 /* libFLAC.a */; };
+		66985EE028BF204D00FDAF69 /* Acknowledgments.rtf in Resources */ = {isa = PBXBuildFile; fileRef = 66985EDF28BF204C00FDAF69 /* Acknowledgments.rtf */; };
 		669C586128A47B4D0038A986 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 669C586028A47B4D0038A986 /* App.swift */; };
 		669C586328A47B4D0038A986 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 669C586228A47B4D0038A986 /* MainView.swift */; };
 		669C586528A47B4E0038A986 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 669C586428A47B4E0038A986 /* Assets.xcassets */; };
@@ -39,6 +40,7 @@
 		666BD94D28B04303006E0408 /* libogg.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libogg.a; sourceTree = "<group>"; };
 		666BD94E28B04303006E0408 /* libFLAC.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libFLAC.a; sourceTree = "<group>"; };
 		66732F6E28A63F400089682A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		66985EDF28BF204C00FDAF69 /* Acknowledgments.rtf */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.rtf; path = Acknowledgments.rtf; sourceTree = "<group>"; };
 		669C585D28A47B4D0038A986 /* Loop3000.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Loop3000.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		669C586028A47B4D0038A986 /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
 		669C586228A47B4D0038A986 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
@@ -106,6 +108,7 @@
 				666A2C2B28B4CC66006172A5 /* Scaler.swift */,
 				666BD94928B04269006E0408 /* Bridge.h */,
 				6613203B28BDA53100BEF1A8 /* DRUNetColor.mlpackage */,
+				66985EDF28BF204C00FDAF69 /* Acknowledgments.rtf */,
 			);
 			path = Loop3000;
 			sourceTree = "<group>";
@@ -176,6 +179,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				669C586528A47B4E0038A986 /* Assets.xcassets in Resources */,
+				66985EE028BF204D00FDAF69 /* Acknowledgments.rtf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -327,9 +331,10 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Loop3000/Loop3000.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 100;
+				CURRENT_PROJECT_VERSION = 200;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Loop3000/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
@@ -341,7 +346,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)",
 				);
-				MARKETING_VERSION = 0.1;
+				MARKETING_VERSION = 0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = io.misakikasumi.Loop3000;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -357,9 +362,10 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Loop3000/Loop3000.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 100;
+				CURRENT_PROJECT_VERSION = 200;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Loop3000/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
@@ -371,7 +377,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)",
 				);
-				MARKETING_VERSION = 0.1;
+				MARKETING_VERSION = 0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = io.misakikasumi.Loop3000;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

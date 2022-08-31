@@ -55,6 +55,25 @@ fileprivate struct Loop3000App: App {
                     (try? result.get()).map { model.musicLibrary.performDiscover(at: $0) }
                 }
             }
+            CommandGroup(after: .appInfo) {
+                Button("Acknowledgments") {
+                    let fileManager = FileManager.default
+                    let workspace = NSWorkspace.shared
+                    let ackPath = Bundle.main.url(forResource: "Acknowledgments", withExtension: "rtf")!
+                    let roPath = URL.temporaryDirectory.appending(component: "Loop3000 Acknowledgments.rtf")
+                    try? fileManager.setAttributes([.immutable: false], ofItemAtPath: roPath.path)
+                    try? fileManager.removeItem(at: roPath)
+                    try! fileManager.copyItem(at: ackPath, to: roPath)
+                    try! fileManager.setAttributes([.immutable: true], ofItemAtPath: roPath.path)
+                    let config = NSWorkspace.OpenConfiguration()
+                    config.addsToRecentItems = false
+                    workspace.open(
+                        [roPath],
+                        withApplicationAt: workspace.urlForApplication(withBundleIdentifier: "com.apple.TextEdit")!,
+                        configuration: config
+                    )
+                }
+            }
         }
         Window("Alert", id: "alert") {
             AlertView($model.alertModel.isPresented, title: model.alertModel.title, message: model.alertModel.message)
