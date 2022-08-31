@@ -32,6 +32,9 @@ struct DiscoverView: View {
                         refreshTick += 1
                     })
                 Divider()
+                    .onAnimatedValue(of: model.musicLibrary.requesting) { requesting in
+                        uniqueRequesting = requesting.dropDuplicates()
+                    }
                 if uniqueRequesting.isEmpty {
                     Spacer()
                     HStack {
@@ -51,9 +54,6 @@ struct DiscoverView: View {
                         .frame(height: 16)
                     }
                     .listStyle(.plain)
-                    .onAnimatedValue(of: model.musicLibrary.requesting) { requesting in
-                        uniqueRequesting = requesting.dropDuplicates()
-                    }
                 }
             } else {
                 if !model.musicLibrary.importedTracks.isEmpty {
