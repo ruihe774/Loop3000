@@ -14,7 +14,7 @@ func stringEncoding(for data: Data) -> String.Encoding? {
 }
 
 func readData(from url: URL) throws -> Data {
-    return try Data(contentsOf: url, options: [.alwaysMapped])
+    return try Data(contentsOf: url)
 }
 
 struct FileDecodingError: Error {
@@ -28,6 +28,49 @@ func readString(from url: URL) throws -> String {
         throw FileDecodingError(url: url)
     }
     return string
+}
+
+fileprivate func errnoError() -> Error {
+    NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+}
+
+class FileReader {
+    private var file: UnsafeMutablePointer<FILE>
+
+    func read(count: Int) -> Data? {
+        guard count >= 0 else { return nil }
+        var buffer = Data(count: count)
+        let readCount = buffer.withUnsafeMutableBytes { ptr in
+            fread(ptr.baseAddress, 1, count, file)
+        }
+        guard readCount == count else {
+            if ferror(file) != 0 {
+                fatalError(errnoError().localizedDescription)
+            } else {
+                return nil
+            }
+        }
+        return buffer
+    }
+
+    func skip(count: Int) -> Bool {
+        return fseek(file, count, SEEK_CUR) == 0
+    }
+
+    init(url: URL) throws {
+        guard let file = url.withUnsafeFileSystemRepresentation({ ptr in
+            fopen(ptr, "r")
+        }) else {
+            throw errnoError()
+        }
+        self.file = file
+    }
+
+    deinit {
+        guard fclose(file) == 0 else {
+            fatalError(errnoError().localizedDescription)
+        }
+    }
 }
 
 fileprivate extension UInt64 {

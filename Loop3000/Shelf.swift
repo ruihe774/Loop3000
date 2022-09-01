@@ -324,8 +324,8 @@ struct Shelf: Codable {
                 if trackNumberR == nil { return true }
                 return trackNumberL! < trackNumberR!
             }
-            if $0.source.normalizedString != $1.source.normalizedString {
-                return $0.source.normalizedString < $1.source.normalizedString
+            if $0.source != $1.source {
+                return $0.source.description < $1.source.description
             }
             return $0.start < $1.start
         }
@@ -500,7 +500,7 @@ func discover(
                 }
             }
             children.subtract(applicableFiles)
-            children.subtract(r.tracks.map { $0.source.normalizedURL })
+            children.subtract(r.tracks.map { $0.source })
         }
         if recursive {
             await withTaskGroup(of: DiscoverResult.self) { taskGroup in
@@ -536,7 +536,10 @@ func discover(
             r.errors.append(error)
             return r
         }
-        let sources = Set(tracks.map { $0.source.normalizedURL })
+        for i in 0 ..< tracks.count {
+            tracks[i].source = tracks[i].source.normalizedURL
+        }
+        let sources = Set(tracks.map { $0.source })
         var metadatas = [URL: Metadata]()
         await withTaskGroup(of: (source: URL, metadata: Metadata?, error: Error?).self) { taskGroup in
             for source in sources {
@@ -567,7 +570,7 @@ func discover(
         }
         tracks = tracks.map {
             var track = $0
-            if let metadata = metadatas[track.source.normalizedURL] {
+            if let metadata = metadatas[track.source] {
                 track.metadata.merge(metadata) { (_, new) in new }
             }
             let albumTitle = track.metadata[\.album]
@@ -666,7 +669,7 @@ fileprivate func mergeShelf(_ a: Shelf, _ b: Shelf) -> Shelf {
 }
 
 fileprivate func mergeTracks(_ a: Track, _ b: Track) -> Track? {
-    guard a.source.normalizedURL == b.source.normalizedURL else { return nil }
+    guard a.source == b.source else { return nil }
     guard abs(a.start.value - b.start.value) < 500 || !a.start.isValid || !b.start.isValid else { return nil }
     guard abs(a.end.value - b.end.value) < 500 || !a.end.isValid || !b.end.isValid else { return nil }
     let durationA = a.start.isValid && a.end.isValid ? a.end.value - a.start.value : .max
@@ -944,33 +947,14 @@ fileprivate class AVAssetImporter: MediaImporter {
     }
 }
 
-fileprivate struct DataReader {
-    private var data: Data
-    private var position: Int
-
-    mutating func read(count: Int) -> Data? {
-        guard count >= 0 else { return nil }
-        guard position + count <= data.count else { return nil }
-        let buffer = data[position ..< position + count]
-        position += count
-        return buffer
-    }
-
-    init(_ data: Data) {
-        precondition(data.startIndex == 0 && data.endIndex == data.count)
-        self.data = data
-        self.position = 0
-    }
-}
-
-fileprivate func parse32bitIntLE(_ data: Data) -> Int {
-    let d = Data(data)
+fileprivate func parse32bitIntLE(_ d: Data) -> Int {
+    precondition(d.startIndex == 0 && d.endIndex == d.count)
     precondition(d.count == 4)
     return Int(d[0]) | Int(d[1]) << 8 | Int(d[2]) << 16 | Int(d[3]) << 24
 }
 
-fileprivate func parse32bitIntBE(_ data: Data) ->  Int {
-    let d = Data(data)
+fileprivate func parse32bitIntBE(_ d: Data) ->  Int {
+    precondition(d.startIndex == 0 && d.endIndex == d.count)
     precondition(d.count == 4)
     return Int(d[3]) | Int(d[2]) << 8 | Int(d[1]) << 16 | Int(d[0]) << 24
 }
@@ -982,12 +966,12 @@ fileprivate class FLACGrabber: MetadataGrabber {
         await tracer?.add(url)
         defer { tracer?.remove(url) }
         let invalid = InvalidFormat(url: url)
-        var reader = DataReader(try readData(from: url))
+        let reader = try FileReader(url: url)
         if reader.read(count: 4) != Data([0x66, 0x4C, 0x61, 0x43]) { throw invalid }
         var last = false
         var metadata = Metadata()
         repeat {
-            guard let header = reader.read(count: 4).map({ Data($0) }) else { throw invalid }
+            guard let header = reader.read(count: 4) else { throw invalid }
             last = (header[0] >> 7) != 0
             let type = header[0] & 0x7f
             let length = Int(header[1]) << 16 | Int(header[2]) << 8 | Int(header[3])
@@ -1013,7 +997,7 @@ fileprivate class FLACGrabber: MetadataGrabber {
                 // We got what we need
                 last = true
             default:
-                guard reader.read(count: length) != nil else { throw invalid }
+                guard reader.skip(count: length) else { throw invalid }
             }
         } while !last
         return metadata
@@ -1171,11 +1155,11 @@ class FLACArtworkLoader: ArtworkLoader {
         await tracer?.add(url)
         defer { tracer?.remove(url) }
         let invalid = InvalidFormat(url: url)
-        var reader = DataReader(try readData(from: url))
+        let reader = try FileReader(url: url)
         if reader.read(count: 4) != Data([0x66, 0x4C, 0x61, 0x43]) { throw invalid }
         var last = false
         repeat {
-            guard let header = reader.read(count: 4).map({ Data($0) }) else { throw invalid }
+            guard let header = reader.read(count: 4) else { throw invalid }
             last = (header[0] >> 7) != 0
             let type = header[0] & 0x7f
             let length = Int(header[1]) << 16 | Int(header[2]) << 8 | Int(header[3])
@@ -1204,7 +1188,7 @@ class FLACArtworkLoader: ArtworkLoader {
                     return image
                 }
             default:
-                guard reader.read(count: length) != nil else { throw invalid }
+                guard reader.skip(count: length) else { throw invalid }
             }
         } while !last
         return nil
