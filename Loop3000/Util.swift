@@ -58,8 +58,9 @@ class FileReader {
     }
 
     init(url: URL) throws {
-        guard let file = url.withUnsafeFileSystemRepresentation({ ptr in
-            fopen(ptr, "r")
+        guard let file = try url.withUnsafeFileSystemRepresentation({
+            guard let ptr = $0 else { throw FileNotFound(url: url) }
+            return fopen(ptr, "r")
         }) else {
             throw errnoError()
         }

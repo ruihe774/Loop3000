@@ -273,8 +273,9 @@ class FLACDecoder: AudioDecoder {
         sampleRate = 0
         let error = AudioDecodingError(url: source)
         decoder = FLAC__stream_decoder_new()!
-        if track.source.path.utf8CString.withUnsafeBytes({ filename in
-            FLAC__stream_decoder_init_file(decoder, filename.baseAddress!, { decoder, frame, buffer, client in
+        if try track.source.withUnsafeFileSystemRepresentation({
+            guard let filename = $0 else { throw FileNotFound(url: track.source) }
+            return FLAC__stream_decoder_init_file(decoder, filename, { decoder, frame, buffer, client in
                 let this = Unmanaged<FLACDecoder>.fromOpaque(client!).takeUnretainedValue()
                 if !this.seeking {
                     do {
