@@ -786,6 +786,9 @@ fileprivate class CueSheetImporter: MediaImporter {
     }
 
     func importMedia(url: URL, tracer: RequestTracer?) async throws -> (albums: [Album], tracks: [Track]) {
+        await tracer?.add(url)
+        var traceRemoved = false
+        defer { if !traceRemoved { tracer?.remove(url) } }
         let content = try readString(from: url)
         var currentFile: URL?
         var currentTrack: Track?
@@ -888,6 +891,8 @@ fileprivate class CueSheetImporter: MediaImporter {
         if let previousTrack = currentTrack {
             tracks.append(previousTrack)
         }
+        tracer?.remove(url)
+        traceRemoved = true
         tracks = tracks.filter { $0.start != .invalid }
         let sourcesNeedDuration = Set(tracks
             .filter { !$0.end.isValid }
