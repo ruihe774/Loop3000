@@ -389,10 +389,13 @@ struct Shelf: Codable {
         self = mergeShelf(self, other)
     }
 
-    func activate() {
+    func activate(url: URL) {
+        let normalizedURL = url.normalizedURL
         for logItem in discoverLog.items {
+            guard logItem.url == normalizedURL else { continue }
             guard let url = try? loadURLFromBookmark(logItem.bookmark) else { continue }
-            assert(url.normalizedURL == logItem.url.normalizedURL)
+            assert(url.normalizedURL == logItem.url)
+            break
         }
     }
 }
@@ -436,8 +439,9 @@ struct DiscoverResult {
 
 fileprivate extension DiscoverLog {
     func needsRediscover(action: DiscoverLogItem.Action, url: URL) -> Bool {
+        let normalizedURL = url.normalizedURL
         guard let logItem = items.first(where: {
-            return $0.url.normalizedURL == url.normalizedURL && (
+            return $0.url == normalizedURL && (
                 $0.action == action || $0.action == .grabbing && action == .importing
             )
         }) else {
@@ -452,7 +456,7 @@ fileprivate extension DiscoverLog {
     }
 
     mutating func log(action: DiscoverLogItem.Action, url: URL) {
-        items.append(DiscoverLogItem(action: action, url: url, bookmark: try! dumpURLToBookmark(url), date: Date.now))
+        items.append(DiscoverLogItem(action: action, url: url.normalizedURL, bookmark: try! dumpURLToBookmark(url), date: Date.now))
     }
 
     mutating func merge(with other: Self) {
@@ -462,7 +466,7 @@ fileprivate extension DiscoverLog {
         }
         var pool = OrderedDictionary<Key, DiscoverLogItem>()
         for item in items + other.items {
-            let key = Key(action: item.action, url: item.url.normalizedURL)
+            let key = Key(action: item.action, url: item.url)
             if let oitem = pool[key] {
                 if item.date < oitem.date {
                     continue

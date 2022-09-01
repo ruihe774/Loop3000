@@ -195,7 +195,6 @@ class MusicLibrary: ObservableObject {
         if let data = try? readData(from: shelfURL) {
             let decoder = PropertyListDecoder()
             shelf = try! decoder.decode(Shelf.self, from: data)
-            shelf.activate()
         }
         let syncQueue = DispatchQueue(label: "MusicLibrary.sync", qos: .utility)
         syncAc = $shelf
@@ -206,6 +205,10 @@ class MusicLibrary: ObservableObject {
                 let encoded = try! encoder.encode(shelf)
                 try! encoded.write(to: shelfURL, options: [.atomic])
             }
+    }
+
+    func activate(url: URL) {
+        shelf.activate(url: url)
     }
 }
 
@@ -457,6 +460,7 @@ class AppModel: ObservableObject {
                     return musicLibrary.tracks[list.items[prevIndex + 1].trackId]
                 }()
 //            }
+            nextTrack.map { musicLibrary.activate(url: $0.source) }
             return nextTrack
         }
 
@@ -520,25 +524,28 @@ class AppModel: ObservableObject {
                     coverData = playingPiece.album?.cover
                     coverImage = coverData.map { loadImage(from: $0) }
                 }
-                nowPlayingCenter.nowPlayingInfo = [
-                    MPMediaItemPropertyPlaybackDuration: playingPiece.duration?.toSeconds() as Any,
+                var nowPlayingInfo = [
                     MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.audio.rawValue,
-                    MPNowPlayingInfoPropertyAssetURL: playingPiece.track?.source as Any,
                     MPNowPlayingInfoPropertyElapsedPlaybackTime: 0.0,
                     MPNowPlayingInfoPropertyPlaybackRate: 1.0,
                     MPNowPlayingInfoPropertyDefaultPlaybackRate: 1.0,
                     MPNowPlayingInfoPropertyIsLiveStream: false,
                     MPMediaItemPropertyTitle: playingPiece.uiTitle,
-                    MPMediaItemPropertyArtist: (playingPiece.artists.isEmpty ? nil : playingPiece.artists.joined(separator: ";")) as Any,
-                    MPMediaItemPropertyAlbumTitle: playingPiece.albumTitle as Any,
-                    MPMediaItemPropertyArtwork: coverImage.map({ coverImage in
+                ]
+                (playingPiece.duration?.toSeconds()).map { nowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = $0 }
+                (playingPiece.track?.source).map { nowPlayingInfo[MPNowPlayingInfoPropertyAssetURL] = $0 }
+                (playingPiece.artists.isEmpty ? nil : playingPiece.artists.joined(separator: ";")).map { nowPlayingInfo[MPMediaItemPropertyArtist] = $0 }
+                playingPiece.albumTitle.map { nowPlayingInfo[MPMediaItemPropertyAlbumTitle] = $0 }
+                coverImage
+                    .map{ coverImage in
                         MPMediaItemArtwork(
                             boundsSize: CGSize(width: Double(coverImage.width), height: Double(coverImage.height))
                         ) { size in
                             NSImage(cgImage: coverImage, size: size)
                         }
-                    }) as Any
-                ]
+                    }
+                    .map { nowPlayingInfo[MPMediaItemPropertyArtwork] = $0 }
+                nowPlayingCenter.nowPlayingInfo = nowPlayingInfo
             } else {
                 nowPlayingCenter.nowPlayingInfo = nil
             }
