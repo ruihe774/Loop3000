@@ -5,7 +5,7 @@ import MediaPlayer
 import UniformTypeIdentifiers
 import Atomics
 
-fileprivate struct ObservableRequestTracer: RequestTracer {
+fileprivate struct ObservableRequestChoker: RequestChoker {
     private var counter = ManagedAtomic<Int>(16)
 
     private func tryAcquire() -> Bool {
@@ -68,7 +68,7 @@ class MusicLibrary: ObservableObject {
     @Published private(set) var requesting: [URL] = []
     @Published private(set) var processing = false
     private let queue = SerialAsyncQueue()
-    private let tracer = ObservableRequestTracer(adding: PassthroughSubject(), removing: PassthroughSubject())
+    private let choker = ObservableRequestChoker(adding: PassthroughSubject(), removing: PassthroughSubject())
 
     private var ac: [Cancellable] = []
     private var syncAc: Cancellable?
@@ -122,14 +122,14 @@ class MusicLibrary: ObservableObject {
             }
             .assign(to: &$playlistItemLocation)
 
-        ac.append(tracer.adding
+        ac.append(choker.adding
             .receiveOnMain()
             .sink { [unowned self] url in
                 requesting.append(url)
             }
         )
 
-        ac.append(tracer.removing
+        ac.append(choker.removing
             .receiveOnMain()
             .sink { [unowned self] url in
                 if let index = requesting.lastIndex(of: url) {
@@ -146,7 +146,7 @@ class MusicLibrary: ObservableObject {
                 return self.shelf
             }
             let (shelf, albums, tracks, errors) = await {
-                let result = await discover(at: url, recursive: true, previousLog: oldShelf.discoverLog, tracer: self.tracer)
+                let result = await discover(at: url, recursive: true, previousLog: oldShelf.discoverLog, choker: self.choker)
                 let albums = result.albums
                 let tracks = result.tracks
                 let log = result.log
@@ -154,7 +154,7 @@ class MusicLibrary: ObservableObject {
                 var newShelf = oldShelf
                 newShelf.merge(with: Shelf(albums: albums, tracks: tracks, discoverLog: log))
                 newShelf.consolidateMetadata()
-                errors.append(contentsOf: await newShelf.loadAllArtworks(tracer: self.tracer))
+                errors.append(contentsOf: await newShelf.loadAllArtworks(choker: self.choker))
                 return (
                     newShelf,
                     albums.compactMap { newShelf.albums.get(by: $0.id) },

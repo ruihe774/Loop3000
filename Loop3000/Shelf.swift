@@ -400,19 +400,19 @@ struct Shelf: Codable {
     }
 }
 
-protocol RequestTracer {
+protocol RequestChoker {
     func add(_ url: URL) async
     func remove(_ url: URL)
 }
 
 protocol MediaImporter: AnyObject {
     var supportedTypes: [UTType] { get }
-    func importMedia(url: URL, tracer: RequestTracer?) async throws -> (albums: [Album], tracks: [Track])
+    func importMedia(url: URL, choker: RequestChoker?) async throws -> (albums: [Album], tracks: [Track])
 }
 
 protocol MetadataGrabber: AnyObject {
     var supportedTypes: [UTType] { get }
-    func grabMetadata(url: URL, tracer: RequestTracer?) async throws -> Metadata
+    func grabMetadata(url: URL, choker: RequestChoker?) async throws -> Metadata
 }
 
 var mediaImporters: [any MediaImporter] = [CueSheetImporter(), AVAssetImporter()]
@@ -482,7 +482,7 @@ func discover(
     at url: URL,
     recursive: Bool = false,
     previousLog: DiscoverLog = .empty,
-    tracer: RequestTracer?
+    choker: RequestChoker?
 ) async -> DiscoverResult {
     var r = DiscoverResult.empty
     if url.isDirectory == true {
@@ -496,7 +496,7 @@ func discover(
             await withTaskGroup(of: DiscoverResult.self) { taskGroup in
                 for url in applicableFiles {
                     taskGroup.addTask {
-                        await discover(at: url, recursive: false, previousLog: previousLog, tracer: tracer)
+                        await discover(at: url, recursive: false, previousLog: previousLog, choker: choker)
                     }
                 }
                 for await rv in taskGroup {
@@ -511,7 +511,7 @@ func discover(
                 for child in children {
                     if child.isDirectory == true {
                         taskGroup.addTask {
-                            await discover(at: child, recursive: true, previousLog: previousLog, tracer: tracer)
+                            await discover(at: child, recursive: true, previousLog: previousLog, choker: choker)
                         }
                     }
                 }
@@ -535,7 +535,7 @@ func discover(
         var albums: [Album] = []
         var tracks: [Track] = []
         do {
-            (albums, tracks) = try await importer.importMedia(url: url, tracer: tracer)
+            (albums, tracks) = try await importer.importMedia(url: url, choker: choker)
         } catch let error {
             r.errors.append(error)
             return r
@@ -557,7 +557,7 @@ func discover(
                 }
                 taskGroup.addTask {
                     do {
-                        return (source: source, metadata: try await grabber.grabMetadata(url: source, tracer: tracer), error: nil)
+                        return (source: source, metadata: try await grabber.grabMetadata(url: source, choker: choker), error: nil)
                     } catch let error {
                         return (source: source, metadata: nil, error: error)
                     }
@@ -792,10 +792,10 @@ fileprivate class CueSheetImporter: MediaImporter {
             .map { $0.0 }
     }
 
-    func importMedia(url: URL, tracer: RequestTracer?) async throws -> (albums: [Album], tracks: [Track]) {
-        await tracer?.add(url)
+    func importMedia(url: URL, choker: RequestChoker?) async throws -> (albums: [Album], tracks: [Track]) {
+        await choker?.add(url)
         var traceRemoved = false
-        defer { if !traceRemoved { tracer?.remove(url) } }
+        defer { if !traceRemoved { choker?.remove(url) } }
         let content = try readString(from: url)
         var currentFile: URL?
         var currentTrack: Track?
@@ -898,7 +898,7 @@ fileprivate class CueSheetImporter: MediaImporter {
         if let previousTrack = currentTrack {
             tracks.append(previousTrack)
         }
-        tracer?.remove(url)
+        choker?.remove(url)
         traceRemoved = true
         tracks = tracks.filter { $0.start != .invalid }
         let sourcesNeedDuration = Set(tracks
@@ -908,8 +908,8 @@ fileprivate class CueSheetImporter: MediaImporter {
         let durations = try await withThrowingTaskGroup(of: (url: URL, duration: CueTime).self) { taskGroup in
             for source in sourcesNeedDuration {
                 taskGroup.addTask {
-                    await tracer?.add(url)
-                    defer { tracer?.remove(url) }
+                    await choker?.add(url)
+                    defer { choker?.remove(url) }
                     let asset = AVAsset(url: source)
                     let duration = try await asset.load(.duration)
                     return (url: source, duration: CueTime(from: duration))
@@ -940,9 +940,9 @@ fileprivate class CueSheetImporter: MediaImporter {
 fileprivate class AVAssetImporter: MediaImporter {
     let supportedTypes = [UTType.audio]
 
-    func importMedia(url: URL, tracer: RequestTracer?) async throws -> (albums: [Album], tracks: [Track]) {
-        await tracer?.add(url)
-        defer { tracer?.remove(url) }
+    func importMedia(url: URL, choker: RequestChoker?) async throws -> (albums: [Album], tracks: [Track]) {
+        await choker?.add(url)
+        defer { choker?.remove(url) }
         let asset = AVAsset(url: url)
         let duration = try await asset.load(.duration)
         let album = Album()
@@ -966,9 +966,9 @@ fileprivate func parse32bitIntBE(_ d: Data) ->  Int {
 fileprivate class FLACGrabber: MetadataGrabber {
     let supportedTypes = [UTType("org.xiph.flac")!]
 
-    func grabMetadata(url: URL, tracer: RequestTracer?) async throws -> Metadata {
-        await tracer?.add(url)
-        defer { tracer?.remove(url) }
+    func grabMetadata(url: URL, choker: RequestChoker?) async throws -> Metadata {
+        await choker?.add(url)
+        defer { choker?.remove(url) }
         let invalid = InvalidFormat(url: url)
         let reader = try FileReader(url: url)
         if reader.read(count: 4) != Data([0x66, 0x4C, 0x61, 0x43]) { throw invalid }
@@ -1025,9 +1025,9 @@ fileprivate class AVAssetGrabber: MetadataGrabber {
         .commonKeyPublisher: metadataCommonKey.publisher,
     ]
 
-    func grabMetadata(url: URL, tracer: RequestTracer?) async throws -> Metadata {
-        await tracer?.add(url)
-        defer { tracer?.remove(url) }
+    func grabMetadata(url: URL, choker: RequestChoker?) async throws -> Metadata {
+        await choker?.add(url)
+        defer { choker?.remove(url) }
         let asset = AVURLAsset(url: url)
         let avMetadata = try await asset.load(.metadata)
         var metadata = Metadata()
@@ -1044,7 +1044,7 @@ fileprivate class AVAssetGrabber: MetadataGrabber {
 protocol ArtworkLoader {
     var supportedTypes: [UTType] { get }
 
-    func loadCover(from url: URL, tracer: RequestTracer?) async throws -> CGImage?
+    func loadCover(from url: URL, choker: RequestChoker?) async throws -> CGImage?
 }
 
 var artworkLoaders: [any ArtworkLoader] = [CGImageArtworkLoader(), FLACArtworkLoader()]
@@ -1056,7 +1056,7 @@ func loadImage(from data: Data) -> CGImage {
 }
 
 extension Shelf {
-    private func loadOriginalArtwork(for album: Album, tracer: RequestTracer? = nil) async throws -> CGImage? {
+    private func loadOriginalArtwork(for album: Album, choker: RequestChoker? = nil) async throws -> CGImage? {
         let tracks = getTracks(for: album)
         let firstTrack = sorted(tracks: tracks).first!
         if firstTrack.source.isFileURL {
@@ -1069,20 +1069,20 @@ extension Shelf {
                     guard let type = UTType(filenameExtension: url.pathExtension) else { return false }
                     return loader.supportedTypes.contains { type.conforms(to: $0) }
                 }) else { continue }
-                guard let cgImage = try await loader.loadCover(from: image, tracer: tracer) else { continue }
+                guard let cgImage = try await loader.loadCover(from: image, choker: choker) else { continue }
                 return cgImage
             }
         }
         let type = UTType(filenameExtension: firstTrack.source.pathExtension)!
         for loader in artworkLoaders {
             guard loader.supportedTypes.contains(where: { type.conforms(to: $0) }) else { continue }
-            guard let cgImage = try await loader.loadCover(from: firstTrack.source, tracer: tracer) else { continue }
+            guard let cgImage = try await loader.loadCover(from: firstTrack.source, choker: choker) else { continue }
             return cgImage
         }
         return nil
     }
 
-    mutating func loadAllArtworks(tracer: RequestTracer? = nil) async -> [Error] {
+    mutating func loadAllArtworks(choker: RequestChoker? = nil) async -> [Error] {
         let scaler = Scaler.shared()
         let (images, errors) = await withTaskGroup(of: (Album, CGImage?, Error?).self) { taskGroup in
             for album in albums {
@@ -1090,7 +1090,7 @@ extension Shelf {
                     let this = self
                     taskGroup.addTask {
                         do {
-                            return (album, try await this.loadOriginalArtwork(for: album, tracer: tracer), nil)
+                            return (album, try await this.loadOriginalArtwork(for: album, choker: choker), nil)
                         } catch let error {
                             return (album, nil, error)
                         }
@@ -1143,9 +1143,9 @@ class CGImageArtworkLoader: ArtworkLoader {
 
     private let cictx = CIContext()
 
-    func loadCover(from url: URL, tracer: RequestTracer? = nil) async throws -> CGImage? {
-        await tracer?.add(url)
-        defer { tracer?.remove(url) }
+    func loadCover(from url: URL, choker: RequestChoker? = nil) async throws -> CGImage? {
+        await choker?.add(url)
+        defer { choker?.remove(url) }
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
         guard let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return nil }
         return image
@@ -1155,9 +1155,9 @@ class CGImageArtworkLoader: ArtworkLoader {
 class FLACArtworkLoader: ArtworkLoader {
     let supportedTypes = [UTType("org.xiph.flac")!]
 
-    func loadCover(from url: URL, tracer: RequestTracer?) async throws -> CGImage? {
-        await tracer?.add(url)
-        defer { tracer?.remove(url) }
+    func loadCover(from url: URL, choker: RequestChoker?) async throws -> CGImage? {
+        await choker?.add(url)
+        defer { choker?.remove(url) }
         let invalid = InvalidFormat(url: url)
         let reader = try FileReader(url: url)
         if reader.read(count: 4) != Data([0x66, 0x4C, 0x61, 0x43]) { throw invalid }
