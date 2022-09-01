@@ -414,6 +414,8 @@ class AppModel: ObservableObject {
     @Published var alertModel = AlertModel()
 
     @Published private(set) var playingPiece: MusicPiece?
+    private var playingPieceBackup: MusicPiece?
+    private var playingPieceNext: MusicPiece?
     @Published private(set) var playbackState = PlaybackState.stopped
     fileprivate var player = PlaybackScheduler()
     var currentTimestamp: CueTime {
@@ -439,9 +441,9 @@ class AppModel: ObservableObject {
 
         player.requestNextHandler = { [unowned self] track in
             var nextTrack: Track?
-//            DispatchQueue.main.sync {
+            DispatchQueue.main.sync {
                 nextTrack = {
-                    guard let playingPiece else {
+                    guard let playingPiece = self.playingPiece ?? playingPieceBackup else {
                         return nil
                     }
                     guard let list = playingPiece.playlist, let item = playingPiece.playlistItem else {
@@ -457,10 +459,12 @@ class AppModel: ObservableObject {
                     guard prevIndex < list.items.count - 1 else {
                         return nil
                     }
-                    return musicLibrary.tracks[list.items[prevIndex + 1].trackId]
+                    let nextItem = list.items[prevIndex + 1]
+                    playingPieceNext = MusicPiece(nextItem, musicLibrary: musicLibrary)
+                    return musicLibrary.tracks[nextItem.trackId]
                 }()
-//            }
-            nextTrack.map { musicLibrary.activate(url: $0.source) }
+                nextTrack.map { musicLibrary.activate(url: $0.source) }
+            }
             return nextTrack
         }
 
@@ -477,9 +481,19 @@ class AppModel: ObservableObject {
                 case (.playing, false):
                     playbackState = .stopped
                     if player.currentTrack == nil && playingPiece != nil {
+                        playingPieceBackup = playingPiece
                         playingPiece = nil
                     }
-                case (.stopped, true), (.paused, true): playbackState = .playing
+                case (.stopped, true), (.paused, true):
+                    playbackState = .playing
+                    if playingPiece == nil && player.currentTrack == playingPieceBackup?.track {
+                        playingPiece = playingPieceBackup
+                        playingPieceBackup = nil
+                    }
+                    if playingPiece == nil && player.currentTrack == playingPieceNext?.track {
+                        playingPiece = playingPieceNext
+                        playingPieceNext = nil
+                    }
                 default: ()
                 }
                 guard playbackState == .playing else { return }

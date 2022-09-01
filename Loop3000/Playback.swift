@@ -44,8 +44,8 @@ class PlaybackScheduler {
     private let synchronizer = AVSampleBufferRenderSynchronizer()
     private let playbackQueue = DispatchQueue(label: "PlaybackScheduler.playback", qos: .userInteractive)
 
-    var requestNextHandler: (Track?) -> Track? = { _ in nil }
-    var errorHandler: (Error) -> () = { fatalError("\($0)") }
+    var requestNextHandler: @Sendable (Track?) -> Track? = { _ in nil }
+    var errorHandler: @Sendable (Error) -> () = { fatalError("\($0)") }
 
     private var current: (Track, AudioDecoder)?
     private var next: (Track, AudioDecoder)?
