@@ -53,6 +53,7 @@ class PlaybackScheduler {
     private var trailingUntil = CMTime.invalid
     private var bufferedForCurrentTrack = CMTime.zero
     private var bufferedForNextTrack = CMTime.zero
+    private var readahead = CMTime.zero
 
     var playing: Bool {
         if synchronizer.rate == 0 {
@@ -81,6 +82,14 @@ class PlaybackScheduler {
         return CueTime(from: max(time, .zero))
     }
 
+    var bufferedSeconds: Double {
+        if bufferedUntil == .zero {
+            return 0
+        } else {
+            return (bufferedUntil - synchronizer.currentTime()).seconds
+        }
+    }
+
     init() {
         synchronizer.addRenderer(renderer)
     }
@@ -88,7 +97,7 @@ class PlaybackScheduler {
     private func playbackLoop() {
         do {
             var currentTime = synchronizer.currentTime()
-            while renderer.isReadyForMoreMediaData {
+            while renderer.isReadyForMoreMediaData || bufferedUntil - currentTime < readahead {
                 currentTime = synchronizer.currentTime()
                 var freshStart = false
                 var useCurrent = false
@@ -131,7 +140,18 @@ class PlaybackScheduler {
                 let decoder = useCurrent ? current!.1 : next!.1
                 let buffer = try decoder.nextSampleBuffer()
                 currentTime = synchronizer.currentTime()
-                bufferedUntil = max(bufferedUntil, currentTime + (freshStart ? CMTime(value: 1, timescale: 3) : CMTime(value: 1, timescale: 100)))
+                let newUntil = max(bufferedUntil, currentTime + (freshStart ? CMTime(value: 1, timescale: 3) : CMTime(value: 1, timescale: 100)))
+                if bufferedUntil != .zero {
+                    let runOutDistance = newUntil - currentTime
+                    if runOutDistance < CMTime(value: 1, timescale: 1) {
+                        readahead = readahead + CMTime(value: 1, timescale: 1)
+                    }
+                    if runOutDistance < CMTime(value: 1, timescale: 2) {
+                        readahead = readahead + readahead
+                    }
+                    readahead = max(readahead, (newUntil - bufferedUntil) + (newUntil - bufferedUntil))
+                }
+                bufferedUntil = newUntil
                 if let buffer {
                     let duration = buffer.duration
                     CMSampleBufferSetOutputPresentationTimeStamp(buffer, newValue: bufferedUntil)
@@ -148,6 +168,7 @@ class PlaybackScheduler {
                     Thread.sleep(forTimeInterval: 0.1)
                 }
             }
+            readahead.value = readahead.value * 4999 / 5000
         } catch let error {
             renderer.stopRequestingMediaData()
             errorHandler(error)
@@ -158,7 +179,24 @@ class PlaybackScheduler {
         playbackQueue.sync {
             self.synchronizer.rate = 1
             self.renderer.stopRequestingMediaData()
+            let timer = DispatchSource.makeTimerSource(queue: playbackQueue)
+            timer.setEventHandler { [unowned self] in
+                self.playbackLoop()
+            }
+            timer.schedule(deadline: DispatchTime.now(), repeating: .milliseconds(100))
+            timer.activate()
+            class Canceller {
+                let timer: DispatchSourceTimer
+                deinit {
+                    timer.cancel()
+                }
+                init(timer: DispatchSourceTimer) {
+                    self.timer = timer
+                }
+            }
+            let canceller = Canceller(timer: timer)
             self.renderer.requestMediaDataWhenReady(on: playbackQueue) { [unowned self] in
+                let _ = canceller
                 self.playbackLoop()
             }
         }

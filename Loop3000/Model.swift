@@ -434,6 +434,9 @@ class AppModel: ObservableObject {
     var currentTimestamp: CueTime {
         player.currentTimestamp
     }
+    var bufferedSeconds: Double {
+        player.bufferedSeconds
+    }
     let refreshTimer = Timer.publish(every: 0.25, on: .main, in: .default)
         .autoconnect()
         .share()

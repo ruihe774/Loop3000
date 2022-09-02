@@ -88,6 +88,14 @@ fileprivate struct Loop3000App: App {
         }
         .windowResizability(.contentSize)
         .commandsRemoved()
+        Window("Buffer Statistics", id: "BufferStatistics") {
+            BufferStatisticsView()
+                .environmentObject(model)
+                .scenePadding()
+                .background(Color.controlBackgroundColor)
+        }
+        .defaultPosition(.topTrailing)
+        .defaultSize(width: 400, height: 200)
     }
 }
 
