@@ -72,10 +72,11 @@ class PlaybackScheduler {
     }
 
     var currentTimestamp: CueTime {
-        var time = (trailingUntil != .invalid && synchronizer.currentTime() >= trailingUntil
+        let currentTime = synchronizer.currentTime()
+        var time = (trailingUntil != .invalid && currentTime >= trailingUntil
                     ? bufferedForNextTrack : bufferedForCurrentTrack)
-        if bufferedUntil != .zero {
-            time = time + (self.synchronizer.currentTime() - bufferedUntil)
+        if bufferedUntil > currentTime {
+            time = time + (currentTime - bufferedUntil)
         }
         return CueTime(from: max(time, .zero))
     }
@@ -86,14 +87,15 @@ class PlaybackScheduler {
 
     private func playbackLoop() {
         do {
-            while self.renderer.isReadyForMoreMediaData {
-                let currentTime = self.synchronizer.currentTime()
+            var currentTime = synchronizer.currentTime()
+            while renderer.isReadyForMoreMediaData {
+                currentTime = synchronizer.currentTime()
                 var freshStart = false
                 var useCurrent = false
                 if trailingUntil != .invalid {
                     if next == nil {
-                        guard let track = self.requestNextHandler(current?.0) else {
-                            self.renderer.stopRequestingMediaData()
+                        guard let track = requestNextHandler(current?.0) else {
+                            renderer.stopRequestingMediaData()
                             return
                         }
                         let decoder = try makeAudioDecoder(for: track)
@@ -115,8 +117,8 @@ class PlaybackScheduler {
                             bufferedForCurrentTrack = bufferedForNextTrack
                             bufferedForNextTrack = .zero
                         } else {
-                            guard let track = self.requestNextHandler(nil) else {
-                                self.renderer.stopRequestingMediaData()
+                            guard let track = requestNextHandler(nil) else {
+                                renderer.stopRequestingMediaData()
                                 return
                             }
                             let decoder = try makeAudioDecoder(for: track)
@@ -127,11 +129,13 @@ class PlaybackScheduler {
                     useCurrent = true
                 }
                 let decoder = useCurrent ? current!.1 : next!.1
+                let buffer = try decoder.nextSampleBuffer()
+                currentTime = synchronizer.currentTime()
                 bufferedUntil = max(bufferedUntil, currentTime + (freshStart ? CMTime(value: 1, timescale: 3) : CMTime(value: 1, timescale: 100)))
-                if let buffer = try decoder.nextSampleBuffer() {
-                    let duration = CMSampleBufferGetDuration(buffer)
+                if let buffer {
+                    let duration = buffer.duration
                     CMSampleBufferSetOutputPresentationTimeStamp(buffer, newValue: bufferedUntil)
-                    self.renderer.enqueue(buffer)
+                    renderer.enqueue(buffer)
                     bufferedUntil = bufferedUntil + duration
                     if useCurrent {
                         bufferedForCurrentTrack = bufferedForCurrentTrack + duration
@@ -145,8 +149,8 @@ class PlaybackScheduler {
                 }
             }
         } catch let error {
-            self.renderer.stopRequestingMediaData()
-            self.errorHandler(error)
+            renderer.stopRequestingMediaData()
+            errorHandler(error)
         }
     }
 
