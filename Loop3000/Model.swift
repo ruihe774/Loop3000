@@ -208,7 +208,20 @@ class MusicLibrary: ObservableObject {
     }
 
     func activate(url: URL) {
-        shelf.activate(url: url)
+        guard let bookmark = shelf.getBookmark(for: url) else { return }
+        guard let loadedURL = try? loadURLFromBookmark(bookmark) else { return }
+        assert(url.normalizedURL == loadedURL.normalizedURL)
+    }
+
+    nonisolated func activateFromOtherThread(url: URL) {
+        precondition(!Thread.isMainThread)
+        var bookmark: Data?
+        DispatchQueue.main.sync {
+            bookmark = shelf.getBookmark(for: url)
+        }
+        guard let bookmark else { return }
+        guard let loadedURL = try? loadURLFromBookmark(bookmark) else { return }
+        assert(url.normalizedURL == loadedURL.normalizedURL)
     }
 }
 
@@ -410,7 +423,7 @@ enum PlaybackState {
 class AppModel: ObservableObject {
     @Published var applicationIsHidden = false
 
-    @Published private(set) var musicLibrary = MusicLibrary()
+    let musicLibrary = MusicLibrary()
     @Published var alertModel = AlertModel()
 
     @Published private(set) var playingPiece: MusicPiece?
@@ -463,8 +476,8 @@ class AppModel: ObservableObject {
                     playingPieceNext = MusicPiece(nextItem, musicLibrary: musicLibrary)
                     return musicLibrary.tracks[nextItem.trackId]
                 }()
-                nextTrack.map { musicLibrary.activate(url: $0.source) }
             }
+            nextTrack.map { musicLibrary.activateFromOtherThread(url: $0.source) }
             return nextTrack
         }
 

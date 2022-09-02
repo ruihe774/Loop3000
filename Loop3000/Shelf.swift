@@ -389,14 +389,13 @@ struct Shelf: Codable {
         self = mergeShelf(self, other)
     }
 
-    func activate(url: URL) {
+    func getBookmark(for url: URL) -> Data? {
         let normalizedURL = url.normalizedURL
         for logItem in discoverLog.items {
             guard logItem.url == normalizedURL else { continue }
-            guard let url = try? loadURLFromBookmark(logItem.bookmark) else { continue }
-            assert(url.normalizedURL == logItem.url)
-            break
+            return logItem.bookmark
         }
+        return nil
     }
 }
 
