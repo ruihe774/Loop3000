@@ -208,7 +208,7 @@ class MusicLibrary: ObservableObject {
     }
 
     func activate(url: URL) {
-        guard let bookmark = shelf.getBookmark(for: url) else { return }
+        guard let bookmark = shelf.getBookmark(normalizedURL: url.normalizedURL) else { return }
         guard let loadedURL = try? loadURLFromBookmark(bookmark) else { return }
         assert(url.normalizedURL == loadedURL.normalizedURL)
     }
@@ -216,8 +216,9 @@ class MusicLibrary: ObservableObject {
     nonisolated func activateFromOtherThread(url: URL) {
         precondition(!Thread.isMainThread)
         var bookmark: Data?
+        let normalizedURL = url.normalizedURL
         DispatchQueue.main.sync {
-            bookmark = shelf.getBookmark(for: url)
+            bookmark = shelf.getBookmark(normalizedURL: normalizedURL)
         }
         guard let bookmark else { return }
         guard let loadedURL = try? loadURLFromBookmark(bookmark) else { return }

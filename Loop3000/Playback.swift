@@ -97,6 +97,8 @@ class PlaybackScheduler {
     private func playbackLoop() {
         do {
             var currentTime = synchronizer.currentTime()
+            let initial = bufferedUntil == .zero
+            var readheadAdjusted = false
             while renderer.isReadyForMoreMediaData || bufferedUntil - currentTime < readahead {
                 currentTime = synchronizer.currentTime()
                 var freshStart = false
@@ -141,7 +143,7 @@ class PlaybackScheduler {
                 let buffer = try decoder.nextSampleBuffer()
                 currentTime = synchronizer.currentTime()
                 let newUntil = max(bufferedUntil, currentTime + (freshStart ? CMTime(value: 1, timescale: 3) : CMTime(value: 1, timescale: 100)))
-                if bufferedUntil != .zero {
+                if !initial && !readheadAdjusted {
                     let runOutDistance = newUntil - currentTime
                     if runOutDistance < CMTime(value: 1, timescale: 1) {
                         readahead = readahead + CMTime(value: 1, timescale: 1)
@@ -151,6 +153,7 @@ class PlaybackScheduler {
                     }
                     readahead = max(readahead, (newUntil - bufferedUntil) + (newUntil - bufferedUntil))
                     readahead = min(CMTime(value: 60, timescale: 1), readahead)
+                    readheadAdjusted = true
                 }
                 bufferedUntil = newUntil
                 if let buffer {
@@ -169,6 +172,7 @@ class PlaybackScheduler {
                     Thread.sleep(forTimeInterval: 0.1)
                 }
             }
+            readahead = readahead + CMTime(value: 1, timescale: 1000000000)
             readahead.value = readahead.value * 4999 / 5000
         } catch let error {
             renderer.stopRequestingMediaData()
