@@ -150,6 +150,7 @@ class PlaybackScheduler {
                         readahead = readahead + readahead
                     }
                     readahead = max(readahead, (newUntil - bufferedUntil) + (newUntil - bufferedUntil))
+                    readahead = min(CMTime(value: 60, timescale: 1), readahead)
                 }
                 bufferedUntil = newUntil
                 if let buffer {
