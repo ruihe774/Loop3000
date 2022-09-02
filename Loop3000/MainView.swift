@@ -1,10 +1,23 @@
 import SwiftUI
 
 fileprivate struct Stub: View {
+    @Environment(\.colorScheme) private var colorScheme: ColorScheme
+
     var body: some View {
         Spacer()
-        Text("Enjoy your music")
-            .foregroundColor(.secondary)
+        ZStack {
+            if colorScheme == .light {
+                Image(decorative: "IconFlat")
+                    .blendMode(.plusDarker)
+                    .opacity(0.1)
+            } else {
+                Image(decorative: "IconFlat")
+                    .colorInvert()
+                    .blendMode(.plusLighter)
+                    .opacity(0.1)
+            }
+        }
+        .offset(CGSize(width: 0, height: -30))
         Spacer()
     }
 }
