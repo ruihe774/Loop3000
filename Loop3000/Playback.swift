@@ -66,17 +66,21 @@ class PlaybackScheduler {
     private var bufferedForNextTrack = CMTime.zero
     private var readahead = CMTime.zero
 
+    var currentTime: CMTime {
+        synchronizer.currentTime()
+    }
+
     var playing: Bool {
         if synchronizer.rate == 0 {
             return false
         }
-        return synchronizer.currentTime() < bufferedUntil
+        return currentTime < bufferedUntil
     }
 
     var currentTrack: Track? {
         guard let current else { return nil }
         guard trailingUntil != .invalid else { return current.0 }
-        if synchronizer.currentTime() >= trailingUntil {
+        if currentTime >= trailingUntil {
             return next?.0
         } else {
             return current.0
@@ -84,7 +88,7 @@ class PlaybackScheduler {
     }
 
     var currentTimestamp: CueTime {
-        let currentTime = synchronizer.currentTime()
+        let currentTime = self.currentTime
         var time = (trailingUntil != .invalid && currentTime >= trailingUntil
                     ? bufferedForNextTrack : bufferedForCurrentTrack)
         if bufferedUntil > currentTime {
@@ -97,7 +101,7 @@ class PlaybackScheduler {
         if bufferedUntil == .zero {
             return 0
         } else {
-            return (bufferedUntil - synchronizer.currentTime()).seconds
+            return (bufferedUntil - currentTime).seconds
         }
     }
 
@@ -107,11 +111,11 @@ class PlaybackScheduler {
 
     private func playbackLoop() {
         do {
-            var currentTime = synchronizer.currentTime()
+            var currentTime = self.currentTime
             let initial = bufferedUntil == .zero
             var readheadAdjusted = false
             while renderer.isReadyForMoreMediaData || bufferedUntil - currentTime < readahead {
-                currentTime = synchronizer.currentTime()
+                currentTime = self.currentTime
                 var freshStart = false
                 var useCurrent = false
                 if trailingUntil != .invalid {
@@ -152,14 +156,14 @@ class PlaybackScheduler {
                 }
                 let decoder = useCurrent ? current!.1 : next!.1
                 let buffer = try decoder.nextSampleBuffer()
-                currentTime = synchronizer.currentTime()
+                currentTime = self.currentTime
                 let newUntil = max(bufferedUntil, currentTime + (freshStart ? CMTime(value: 1, timescale: 3) : CMTime(value: 1, timescale: 100)))
                 if !initial && !readheadAdjusted {
                     let runOutDistance = newUntil - currentTime
                     if runOutDistance < CMTime(value: 1, timescale: 1) {
                         readahead = readahead + CMTime(value: 1, timescale: 1)
                     }
-                    if runOutDistance < CMTime(value: 1, timescale: 2) {
+                    if runOutDistance < CMTime(value: readahead.value, timescale: readahead.timescale * 2) {
                         readahead = readahead + readahead
                     }
                     readahead = max(readahead, (newUntil - bufferedUntil) + (newUntil - bufferedUntil))
@@ -169,7 +173,7 @@ class PlaybackScheduler {
                 bufferedUntil = newUntil
                 if let buffer {
                     let duration = buffer.duration
-                    CMSampleBufferSetOutputPresentationTimeStamp(buffer, newValue: bufferedUntil)
+                    try buffer.setOutputPresentationTimeStamp(bufferedUntil)
                     renderer.enqueue(buffer)
                     delegate.playbackDidEnqueue(buffer: buffer)
                     bufferedUntil = bufferedUntil + duration
