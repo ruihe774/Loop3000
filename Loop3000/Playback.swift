@@ -39,13 +39,24 @@ func makeAudioDecoder(for track: Track) throws -> any AudioDecoder {
     return try decoderType.init(track: track)
 }
 
+protocol PlaybackDelegate: AnyObject {
+    func request(nextOf: Track?) -> Track?
+    func playbackDidError(error: Error)
+    func playbackDidEnqueue(buffer: CMSampleBuffer)
+}
+
+fileprivate class NullPlaybackDelegate: PlaybackDelegate {
+    func request(nextOf: Track?) -> Track? { nil }
+    func playbackDidError(error: Error) {}
+    func playbackDidEnqueue(buffer: CMSampleBuffer) {}
+}
+
 class PlaybackScheduler {
     private let renderer = AVSampleBufferAudioRenderer()
     private let synchronizer = AVSampleBufferRenderSynchronizer()
     private let playbackQueue = DispatchQueue(label: "PlaybackScheduler.playback", qos: .userInteractive)
 
-    var requestNextHandler: @Sendable (Track?) -> Track? = { _ in nil }
-    var errorHandler: @Sendable (Error) -> () = { fatalError("\($0)") }
+    var delegate: PlaybackDelegate = NullPlaybackDelegate()
 
     private var current: (Track, AudioDecoder)?
     private var next: (Track, AudioDecoder)?
@@ -105,7 +116,7 @@ class PlaybackScheduler {
                 var useCurrent = false
                 if trailingUntil != .invalid {
                     if next == nil {
-                        guard let track = requestNextHandler(current?.0) else {
+                        guard let track = delegate.request(nextOf: current?.0) else {
                             renderer.stopRequestingMediaData()
                             return
                         }
@@ -128,7 +139,7 @@ class PlaybackScheduler {
                             bufferedForCurrentTrack = bufferedForNextTrack
                             bufferedForNextTrack = .zero
                         } else {
-                            guard let track = requestNextHandler(nil) else {
+                            guard let track = delegate.request(nextOf: nil) else {
                                 renderer.stopRequestingMediaData()
                                 return
                             }
@@ -160,6 +171,7 @@ class PlaybackScheduler {
                     let duration = buffer.duration
                     CMSampleBufferSetOutputPresentationTimeStamp(buffer, newValue: bufferedUntil)
                     renderer.enqueue(buffer)
+                    delegate.playbackDidEnqueue(buffer: buffer)
                     bufferedUntil = bufferedUntil + duration
                     if useCurrent {
                         bufferedForCurrentTrack = bufferedForCurrentTrack + duration
@@ -176,7 +188,7 @@ class PlaybackScheduler {
             readahead.value = readahead.value * 4999 / 5000
         } catch let error {
             renderer.stopRequestingMediaData()
-            errorHandler(error)
+            delegate.playbackDidError(error: error)
         }
     }
 

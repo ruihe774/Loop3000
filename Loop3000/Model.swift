@@ -450,17 +450,18 @@ class AppModel: ObservableObject {
 
     private var ac: [Cancellable] = []
 
-    init() {
-        ac.append(musicLibrary
-            .objectWillChange
-            .sink { [unowned self] _ in objectWillChange.send() }
-        )
+    private class MyPlaybackDelegate: PlaybackDelegate {
+        unowned let model: AppModel
 
-        player.requestNextHandler = { [unowned self] track in
+        init(model: AppModel) {
+            self.model = model
+        }
+
+        func request(nextOf track: Track?) -> Track? {
             var nextTrack: Track?
             DispatchQueue.main.sync {
                 nextTrack = {
-                    guard let playingPiece = self.playingPiece ?? playingPieceBackup else {
+                    guard let playingPiece = model.playingPiece ?? model.playingPieceBackup else {
                         return nil
                     }
                     guard let list = playingPiece.playlist, let item = playingPiece.playlistItem else {
@@ -477,19 +478,32 @@ class AppModel: ObservableObject {
                         return nil
                     }
                     let nextItem = list.items[prevIndex + 1]
-                    playingPieceNext = MusicPiece(nextItem, musicLibrary: musicLibrary)
-                    return musicLibrary.tracks[nextItem.trackId]
+                    model.playingPieceNext = MusicPiece(nextItem, musicLibrary: model.musicLibrary)
+                    return model.musicLibrary.tracks[nextItem.trackId]
                 }()
             }
-            nextTrack.map { musicLibrary.activateFromOtherThread(url: $0.source) }
+            nextTrack.map { model.musicLibrary.activateFromOtherThread(url: $0.source) }
             return nextTrack
         }
 
-        player.errorHandler = { [unowned self] error in
+        func playbackDidError(error: Error) {
             DispatchQueue.main.async {
-                self.alert(title: "Playback Error", message: error.localizedDescription)
+                self.model.alert(title: "Playback Error", message: error.localizedDescription)
             }
         }
+
+        func playbackDidEnqueue(buffer: CMSampleBuffer) {
+
+        }
+    }
+
+    init() {
+        ac.append(musicLibrary
+            .objectWillChange
+            .sink { [unowned self] _ in objectWillChange.send() }
+        )
+
+        player.delegate = MyPlaybackDelegate(model: self)
 
         var tick = 0
         ac.append(refreshTimer
