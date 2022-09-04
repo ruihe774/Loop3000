@@ -198,10 +198,10 @@ class PlaybackScheduler {
     }
 
     func play() {
-        playbackQueue.sync {
+        playbackQueue.async {
             self.synchronizer.rate = 1
             self.renderer.stopRequestingMediaData()
-            let timer = DispatchSource.makeTimerSource(queue: playbackQueue)
+            let timer = DispatchSource.makeTimerSource(queue: self.playbackQueue)
             timer.setEventHandler { [unowned self] in
                 self.playbackLoop()
             }
@@ -217,7 +217,7 @@ class PlaybackScheduler {
                 }
             }
             let canceller = Canceller(timer: timer)
-            self.renderer.requestMediaDataWhenReady(on: playbackQueue) { [unowned self] in
+            self.renderer.requestMediaDataWhenReady(on: self.playbackQueue) { [unowned self] in
                 let _ = canceller
                 self.playbackLoop()
             }
@@ -225,13 +225,13 @@ class PlaybackScheduler {
     }
 
     func pause() {
-        playbackQueue.sync {
+        playbackQueue.async {
             self.synchronizer.rate = 0
         }
     }
 
     func stop() {
-        playbackQueue.sync {
+        playbackQueue.async {
             self.renderer.stopRequestingMediaData()
             self.renderer.flush()
             self.synchronizer.rate = 0
@@ -245,10 +245,10 @@ class PlaybackScheduler {
     }
 
     func seek(to time: CueTime) {
-        playbackQueue.sync {
+        playbackQueue.async {
             self.renderer.flush()
-            current!.1.seek(to: CMTime(from: time))
-            next?.1.seek(to: .zero)
+            self.current!.1.seek(to: CMTime(from: time))
+            self.next?.1.seek(to: .zero)
             self.bufferedUntil = .zero
             self.trailingUntil = .invalid
             self.bufferedForCurrentTrack = CMTime(from: time)
