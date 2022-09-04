@@ -25,6 +25,7 @@
 		669C586528A47B4E0038A986 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 669C586428A47B4E0038A986 /* Assets.xcassets */; };
 		66AE187A28B666AE00DE637A /* Collections in Frameworks */ = {isa = PBXBuildFile; productRef = 66AE187928B666AE00DE637A /* Collections */; };
 		66AE611728B41C6100F04DF5 /* Playback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66AE611628B41C6100F04DF5 /* Playback.swift */; };
+		66B583FB28C4C8E100F04C97 /* SpectrumView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66B583FA28C4C8E100F04C97 /* SpectrumView.swift */; };
 		66C0EB1728BFDEF500DDB219 /* Atomics in Frameworks */ = {isa = PBXBuildFile; productRef = 66C0EB1628BFDEF500DDB219 /* Atomics */; };
 /* End PBXBuildFile section */
 
@@ -50,6 +51,7 @@
 		669C586428A47B4E0038A986 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		669C586928A47B4E0038A986 /* Loop3000.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Loop3000.entitlements; sourceTree = "<group>"; };
 		66AE611628B41C6100F04DF5 /* Playback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Playback.swift; sourceTree = "<group>"; };
+		66B583FA28C4C8E100F04C97 /* SpectrumView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpectrumView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -109,6 +111,7 @@
 				6604F69E28A90F4400B84549 /* PlaylistView.swift */,
 				6604F6A028A92BF900B84549 /* PlayerView.swift */,
 				66925D3528C200A500B14856 /* BufferStatisticsView.swift */,
+				66B583FA28C4C8E100F04C97 /* SpectrumView.swift */,
 				662C8ABF28AF8C5C003983FE /* Util.swift */,
 				666A2C2B28B4CC66006172A5 /* Scaler.swift */,
 				666BD94928B04269006E0408 /* Bridge.h */,
@@ -200,6 +203,7 @@
 				66AE611728B41C6100F04DF5 /* Playback.swift in Sources */,
 				6604F6A128A92BF900B84549 /* PlayerView.swift in Sources */,
 				66684C7628A7C28800C32BC8 /* Model.swift in Sources */,
+				66B583FB28C4C8E100F04C97 /* SpectrumView.swift in Sources */,
 				6604F69F28A90F4400B84549 /* PlaylistView.swift in Sources */,
 				669C586328A47B4D0038A986 /* MainView.swift in Sources */,
 				66925D3628C200A500B14856 /* BufferStatisticsView.swift in Sources */,

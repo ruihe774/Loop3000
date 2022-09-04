@@ -97,11 +97,11 @@ class PlaybackScheduler {
         return CueTime(from: max(time, .zero))
     }
 
-    var bufferedSeconds: Double {
+    var bufferSurplus: CMTime {
         if bufferedUntil == .zero || current == nil {
-            return 0
+            return .zero
         } else {
-            return (bufferedUntil - currentTime).seconds
+            return bufferedUntil - currentTime
         }
     }
 

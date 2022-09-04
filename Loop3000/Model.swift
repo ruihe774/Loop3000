@@ -436,8 +436,12 @@ class AppModel: ObservableObject {
         player.currentTimestamp
     }
     var bufferedSeconds: Double {
-        player.bufferedSeconds
+        player.bufferSurplus.seconds
     }
+    var currentPlayerTime: CMTime {
+        player.currentTime
+    }
+    let audioBufferEnqueud = PassthroughSubject<CMSampleBuffer, Never>()
     let refreshTimer = Timer.publish(every: 0.25, on: .main, in: .default)
         .autoconnect()
         .share()
@@ -498,7 +502,9 @@ class AppModel: ObservableObject {
         }
 
         func playbackDidEnqueue(buffer: CMSampleBuffer) {
-
+            DispatchQueue.main.async {
+                self.model.audioBufferEnqueud.send(buffer)
+            }
         }
     }
 

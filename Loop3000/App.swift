@@ -96,6 +96,14 @@ fileprivate struct Loop3000App: App {
         }
         .defaultPosition(.topTrailing)
         .defaultSize(width: 400, height: 200)
+        Window("Spectrum", id: "Spectrum") {
+            SpectrumView()
+                .environmentObject(model)
+                .scenePadding()
+                .background(Color.controlBackgroundColor)
+        }
+        .defaultPosition(.topTrailing)
+        .defaultSize(width: 400, height: 400)
     }
 }
 
