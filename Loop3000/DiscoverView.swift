@@ -28,7 +28,7 @@ struct DiscoverView: View {
                 Text("Discovering your music" + String(repeating: ".", count: dotCount))
                     .font(.headline)
                     .padding()
-                    .onReceive(model.refreshTimer, perform: { _ in
+                    .onReceive(model.guiRefreshTimer, perform: { _ in
                         refreshTick += 1
                     })
                 Divider()

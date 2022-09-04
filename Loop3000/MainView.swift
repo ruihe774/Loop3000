@@ -41,35 +41,31 @@ fileprivate struct InnerMainView: View {
     @State private var currentView = ShowView.stub
 
     var body: some View {
-        if model.applicationIsHidden {
-            Spacer()
-        } else {
-            HStack(spacing: 0) {
-                Sidebar()
-                ZStack {
-                    Rectangle()
-                        .fill(Color.windowBackgroundColor)
-                        .shadow(radius: 1)
-                    VStack(spacing: 0) {
-                        PlayerView()
-                        Divider()
-                        switch (currentView) {
-                        case .discover:
-                            DiscoverView()
-                        case .playlist where windowModel.selectedList.flatMap({ model.musicLibrary.playlists[$0] }) != nil:
-                            PlaylistView(windowModel.selectedList!)
-                        default:
-                            Stub()
-                        }
+        HStack(spacing: 0) {
+            Sidebar()
+            ZStack {
+                Rectangle()
+                    .fill(Color.windowBackgroundColor)
+                    .shadow(radius: 1)
+                VStack(spacing: 0) {
+                    PlayerView()
+                    Divider()
+                    switch (currentView) {
+                    case .discover:
+                        DiscoverView()
+                    case .playlist where windowModel.selectedList.flatMap({ model.musicLibrary.playlists[$0] }) != nil:
+                        PlaylistView(windowModel.selectedList!)
+                    default:
+                        Stub()
                     }
                 }
             }
-            .navigationTitle(windowModel.selectedList.flatMap {
-                model.musicLibrary.playlists[$0]?.title
-            } ?? "Loop3000")
-            .onAnimatedValue(of: windowModel.currentView) {
-                currentView = $0
-            }
+        }
+        .navigationTitle(windowModel.selectedList.flatMap {
+            model.musicLibrary.playlists[$0]?.title
+        } ?? "Loop3000")
+        .onAnimatedValue(of: windowModel.currentView) {
+            currentView = $0
         }
     }
 }

@@ -441,6 +441,11 @@ class AppModel: ObservableObject {
     let refreshTimer = Timer.publish(every: 0.25, on: .main, in: .default)
         .autoconnect()
         .share()
+    lazy private(set) var guiRefreshTimer: some Publisher<Date, Never> = {
+        refreshTimer
+            .compactMap { [unowned self] in applicationIsHidden ? nil : $0 }
+            .share()
+    }()
 
     private var nowPlayingCenter: MPNowPlayingInfoCenter { MPNowPlayingInfoCenter.default() }
     private var remoteControlCenter: MPRemoteCommandCenter { MPRemoteCommandCenter.shared() }

@@ -79,7 +79,7 @@ struct PlayerView: View {
                     updateDuration(playingPiece)
                     updateTimestamp(model.currentTimestamp)
                 }
-                .onReceive(model.refreshTimer) { _ in
+                .onReceive(model.guiRefreshTimer) { _ in
                     updateTimestamp(model.currentTimestamp)
                 }
                 .onChange(of: editing) { editing in

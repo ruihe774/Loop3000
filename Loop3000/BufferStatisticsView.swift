@@ -37,7 +37,7 @@ struct BufferStatisticsView: View {
                             .init(color: .red, location: 1)
                         ], startPoint: .top, endPoint: .bottom))
                     }
-                    .onReceive(model.refreshTimer) { date in
+                    .onReceive(model.guiRefreshTimer) { date in
                         withAnimation {
                             statistics.append(BufferStatistic(sampleTime: date, bufferedSeconds: model.bufferedSeconds))
                             while statistics.count > Int(geo.size.width) {
