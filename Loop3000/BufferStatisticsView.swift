@@ -37,10 +37,15 @@ struct BufferStatisticsView: View {
                             .init(color: .red, location: 1)
                         ], startPoint: .top, endPoint: .bottom))
                     }
-                    .onReceive(model.guiRefreshTimer) { date in
+                    .onReceive(model.guiRefreshTimer
+                        .scan((false, Date(timeIntervalSinceReferenceDate: 0))) { (previous, currentDate) in
+                            return (!previous.0, currentDate)
+                        }
+                        .compactMap { $0 ? $1 : nil }
+                    ) { date in
                         withAnimation {
                             statistics.append(BufferStatistic(sampleTime: date, bufferedSeconds: model.bufferedSeconds))
-                            while statistics.count > Int(geo.size.width) {
+                            while statistics.count > Int(geo.size.width) / 2 {
                                 let _ = statistics.popFirst()
                             }
                         }
