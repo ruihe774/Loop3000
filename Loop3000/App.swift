@@ -99,7 +99,6 @@ fileprivate struct Loop3000App: App {
         Window("Spectrum", id: "Spectrum") {
             SpectrumView()
                 .environmentObject(model)
-                .scenePadding()
                 .background(Color.controlBackgroundColor)
         }
         .defaultPosition(.topTrailing)

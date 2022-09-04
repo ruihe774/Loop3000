@@ -1,7 +1,6 @@
 import Accelerate
 import CoreVideo
 import CoreMedia
-import VideoToolbox
 import SwiftUI
 import Charts
 import Combine
@@ -9,6 +8,7 @@ import Collections
 
 struct SpectrumView: View {
     @EnvironmentObject private var model: AppModel
+    @Environment(\.displayScale) private var displayScale: CGFloat
 
     private static let numBands = 1024
     private let dsp = try! vDSP.DiscreteFourierTransform(
@@ -29,10 +29,10 @@ struct SpectrumView: View {
 
     var body: some View {
         GeometryReader { geo in
-            VStack {
+            VStack(spacing: 0) {
                 ForEach(Array(images.enumerated()), id: \.offset) { (i, image) in
-                    Image(image, scale: 1, label: Text("Spectrum of channel \(i)"))
-                        .resizable()
+                    if i != 0 { Divider() }
+                    Image(image, scale: displayScale, label: Text("Spectrum of channel \(i)"))
                 }
             }
             .onReceive(model.audioBufferEnqueud) { sampleBuffers.append($0) }
@@ -135,33 +135,41 @@ struct SpectrumView: View {
                 guard let channels = spectrums.first?.count else { return }
                 let width = Int(geo.size.width) / 2
                 let height = Self.numBands / 2
-                images = (0 ..< channels).map { j in
-                    var outPixelBuffer: CVPixelBuffer?
-                    CVPixelBufferCreate(kCFAllocatorDefault, width, height, kCMPixelFormat_32BGRA, nil, &outPixelBuffer)
-                    let pixelBuffer = outPixelBuffer!
-                    CVPixelBufferLockBaseAddress(pixelBuffer, .init(rawValue: 0))
-                    defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .init(rawValue: 0)) }
-                    let ptr = CVPixelBufferGetBaseAddress(pixelBuffer)!
-                    let bytesPerRow = Int(CVPixelBufferGetBytesPerRow(pixelBuffer))
-                    memset(ptr, 0, bytesPerRow * height)
-                    for (i, freqBuffer) in spectrums.map({ $0[j] }).enumerated() {
-                        assert(i < width)
-                        for (j, db) in freqBuffer.enumerated() {
-                            assert(j < height)
-                            let pixelPtr = (ptr + bytesPerRow * (height - j - 1)).assumingMemoryBound(to: UInt32.self) + i
-                            let level = max(0, db / 120 + 1)
-                            let (r, g, b) = soxPalette(level: level)
-                            let intR = UInt32(r * 255)
-                            let intG = UInt32(g * 255)
-                            let intB = UInt32(b * 255)
-                            pixelPtr.pointee = intR << 16 | intG << 8 | intB | 0xff000000
+                let ciImages = (0 ..< channels)
+                    .map { j in
+                        var outPixelBuffer: CVPixelBuffer?
+                        CVPixelBufferCreate(kCFAllocatorDefault, width, height, kCMPixelFormat_32BGRA, nil, &outPixelBuffer)
+                        let pixelBuffer = outPixelBuffer!
+                        CVPixelBufferLockBaseAddress(pixelBuffer, .init(rawValue: 0))
+                        defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .init(rawValue: 0)) }
+                        let ptr = CVPixelBufferGetBaseAddress(pixelBuffer)!
+                        let bytesPerRow = Int(CVPixelBufferGetBytesPerRow(pixelBuffer))
+                        memset(ptr, 0, bytesPerRow * height)
+                        for (i, freqBuffer) in spectrums.map({ $0[j] }).enumerated() {
+                            assert(i < width)
+                            for (j, db) in freqBuffer.enumerated() {
+                                assert(j < height)
+                                let pixelPtr = (ptr + bytesPerRow * j).assumingMemoryBound(to: UInt32.self) + i
+                                let level = max(0, db / 120 + 1)
+                                let intLevel = UInt32(level * 255)
+                                pixelPtr.pointee = intLevel << 16 | intLevel << 8 | intLevel | 0xff000000
+                            }
                         }
+                        return CIImage(cvPixelBuffer: pixelBuffer)
                     }
-                    var outImage: CGImage?
-                    VTCreateCGImageFromCVPixelBuffer(pixelBuffer, options: nil, imageOut: &outImage)
-                    let image = outImage!
-                    return image
-                }
+                    .map { (img: CIImage) in
+                        let scaleX = geo.size.width * displayScale / img.extent.width
+                        let scaleY = (geo.size.height - CGFloat(channels) + 1) / CGFloat(channels) * displayScale / img.extent.height
+                        return img.transformed(
+                            by: img.orientationTransform(for: .downMirrored)
+                                .concatenating(CGAffineTransform(scaleX: scaleX, y: scaleY))
+                        )
+                    }
+                    .map { (img: CIImage) in
+                        img.applyingFilter("CIColorMap", parameters: ["inputGradientImage": soxColorMap])
+                    }
+                let cictx = CIContext(options: [.workingColorSpace: nil as Any? as Any])
+                images = ciImages.map { cictx.createCGImage($0, from: $0.extent)! }
             }
         }
     }
@@ -191,3 +199,20 @@ fileprivate func soxPalette(level: Float) -> (r: Float, g: Float, b: Float){
 
     return (r: r, g: g, b: b)
 }
+
+fileprivate let soxColorMap = {
+    var outPixelBuffer: CVPixelBuffer?
+    CVPixelBufferCreate(kCFAllocatorDefault, 256, 1, kCMPixelFormat_32BGRA, nil, &outPixelBuffer)
+    let pixelBuffer = outPixelBuffer!
+    CVPixelBufferLockBaseAddress(pixelBuffer, .init(rawValue: 0))
+    defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .init(rawValue: 0)) }
+    let ptr = CVPixelBufferGetBaseAddress(pixelBuffer)!.assumingMemoryBound(to: UInt32.self)
+    for i in 0 ... 255 {
+        let (r, g, b) = soxPalette(level: Float(i) / 255)
+        let intR = UInt32(r * 255)
+        let intG = UInt32(g * 255)
+        let intB = UInt32(b * 255)
+        (ptr + i).pointee = intR << 16 | intG << 8 | intB | 0xff000000
+    }
+    return CIImage(cvPixelBuffer: pixelBuffer)
+}()
