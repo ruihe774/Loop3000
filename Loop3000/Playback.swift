@@ -98,7 +98,7 @@ class PlaybackScheduler {
     }
 
     var bufferedSeconds: Double {
-        if bufferedUntil == .zero {
+        if bufferedUntil == .zero || current == nil {
             return 0
         } else {
             return (bufferedUntil - currentTime).seconds
