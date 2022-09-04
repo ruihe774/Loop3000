@@ -159,6 +159,7 @@ class PlaybackScheduler {
                 currentTime = self.currentTime
                 let newUntil = max(bufferedUntil, currentTime + (freshStart ? CMTime(value: 1, timescale: 3) : CMTime(value: 1, timescale: 100)))
                 if !initial && !readheadAdjusted {
+                    let originalReadahead = readahead
                     let runOutDistance = newUntil - currentTime
                     if runOutDistance < CMTime(value: 1, timescale: 1) {
                         readahead = readahead + CMTime(value: 1, timescale: 1)
@@ -168,7 +169,7 @@ class PlaybackScheduler {
                     }
                     readahead = max(readahead, (newUntil - bufferedUntil) + (newUntil - bufferedUntil))
                     readahead = min(CMTime(value: 60, timescale: 1), readahead)
-                    readheadAdjusted = true
+                    readheadAdjusted = readahead != originalReadahead
                 }
                 bufferedUntil = newUntil
                 if let buffer {
