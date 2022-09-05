@@ -102,7 +102,7 @@ fileprivate struct Loop3000App: App {
                 .background(Color.controlBackgroundColor)
         }
         .defaultPosition(.topTrailing)
-        .defaultSize(width: 400, height: 400)
+        .defaultSize(width: 600, height: 400)
     }
 }
 

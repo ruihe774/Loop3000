@@ -1,6 +1,7 @@
 import Accelerate
 import CoreVideo
 import CoreMedia
+import CoreText
 import SwiftUI
 import Charts
 import Combine
@@ -24,6 +25,7 @@ struct SpectrumView: View {
         isHalfWindow: false
     )
     @State private var sampleBuffers: [CMSampleBuffer] = []
+    @State private var sampleRate = 0
     @State private var spectrums: Deque<[[Float]]> = []
     @State private var images: [CGImage] = []
 
@@ -123,6 +125,7 @@ struct SpectrumView: View {
                         }
                         return vDSP.divide(mergedFreqBuffer, Float(freqBuffers.count))
                     }
+                sampleRate = Int(asbd.mSampleRate)
                 spectrums.append(freqBuffers)
                 while spectrums.count > Int(geo.size.width) / 2 {
                     let _ = spectrums.popFirst()
@@ -135,9 +138,11 @@ struct SpectrumView: View {
                 guard let channels = spectrums.first?.count else { return }
                 let width = Int(geo.size.width) / 2
                 let height = Self.numBands / 3
-                let exp: Float = 1.5
+                let exp: Float = 2
                 let corr = Float(Self.numBands / 2) / pow(Float(height), exp)
-                let ciImages = (0 ..< channels)
+                let freqBin = Float(sampleRate) / Float(Self.numBands)
+                let cictx = CIContext(options: [.workingColorSpace: nil as Any? as Any])
+                images = (0 ..< channels)
                     .map { j in
                         var outPixelBuffer: CVPixelBuffer?
                         CVPixelBufferCreate(kCFAllocatorDefault, width, height, kCMPixelFormat_32BGRA, nil, &outPixelBuffer)
@@ -159,19 +164,55 @@ struct SpectrumView: View {
                         }
                         return CIImage(cvPixelBuffer: pixelBuffer)
                     }
-                    .map { (img: CIImage) in
-                        let scaleX = geo.size.width * displayScale / img.extent.width
-                        let scaleY = (geo.size.height - CGFloat(channels) + 1) / CGFloat(channels) * displayScale / img.extent.height
-                        return img.transformed(
-                            by: img.orientationTransform(for: .downMirrored)
-                                .concatenating(CGAffineTransform(scaleX: scaleX, y: scaleY))
+                    .map { image in
+                        let targetW = geo.size.width * displayScale
+                        let targetH = (geo.size.height - CGFloat(channels) + 1) / CGFloat(channels) * displayScale
+                        let scaleX = targetW / image.extent.width
+                        let scaleY = targetH / image.extent.height
+                        let scaleTransform = CGAffineTransform(scaleX: scaleX, y: scaleY)
+                        let transformedImage = image
+                            .transformed(by: image.orientationTransform(for: .downMirrored).concatenating(scaleTransform))
+                            .applyingFilter("CIColorMap", parameters: ["inputGradientImage": soxColorMap])
+                        let cgctx = CGContext(
+                            data: nil,
+                            width: Int(targetW),
+                            height: Int(targetH),
+                            bitsPerComponent: 8,
+                            bytesPerRow: 0,
+                            space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                            bitmapInfo: CGImageAlphaInfo.noneSkipFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+                        )!
+                        cictx.render(
+                            transformedImage,
+                            toBitmap: cgctx.data!,
+                            rowBytes: cgctx.bytesPerRow,
+                            bounds: transformedImage.extent,
+                            format: .BGRA8,
+                            colorSpace: nil
                         )
+                        cgctx.setStrokeColor(.white)
+                        cgctx.setLineWidth(2)
+                        for freq in [100, 400, 1000, 2000, 5000, 10000, 15000, 20000] {
+                            let originalY = pow(Float(freq) / freqBin / corr, 1 / exp)
+                            let transformedY = CGPoint(x: 0, y: CGFloat(originalY)).applying(scaleTransform).y
+                            cgctx.strokeLineSegments(between: [
+                                CGPoint(x: 50, y: transformedY),
+                                CGPoint(x: 150, y: transformedY)
+                            ])
+                            cgctx.textPosition = CGPoint(x: 15, y: transformedY - 4)
+                            let labelString = CFAttributedStringCreate(
+                                kCFAllocatorDefault,
+                                (freq < 1000 ? "\(freq)" : "\(freq / 1000)k") as CFString,
+                                [
+                                    kCTForegroundColorAttributeName: CGColor.white,
+                                    kCTFontWeightTrait: NSFont.Weight.bold
+                                ] as CFDictionary
+                            )!
+                            let labelLine = CTLineCreateWithAttributedString(labelString)
+                            CTLineDraw(labelLine, cgctx)
+                        }
+                        return cgctx.makeImage()!
                     }
-                    .map { (img: CIImage) in
-                        img.applyingFilter("CIColorMap", parameters: ["inputGradientImage": soxColorMap])
-                    }
-                let cictx = CIContext(options: [.workingColorSpace: nil as Any? as Any])
-                images = ciImages.map { cictx.createCGImage($0, from: $0.extent)! }
             }
         }
     }
