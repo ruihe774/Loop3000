@@ -134,7 +134,9 @@ struct SpectrumView: View {
             .onChange(of: spectrums) { spectrums in
                 guard let channels = spectrums.first?.count else { return }
                 let width = Int(geo.size.width) / 2
-                let height = Self.numBands / 2
+                let height = Self.numBands / 3
+                let exp: Float = 1.5
+                let corr = Float(Self.numBands / 2) / pow(Float(height), exp)
                 let ciImages = (0 ..< channels)
                     .map { j in
                         var outPixelBuffer: CVPixelBuffer?
@@ -147,9 +149,9 @@ struct SpectrumView: View {
                         memset(ptr, 0, bytesPerRow * height)
                         for (i, freqBuffer) in spectrums.map({ $0[j] }).enumerated() {
                             assert(i < width)
-                            for (j, db) in freqBuffer.enumerated() {
-                                assert(j < height)
+                            for j in 0 ..< height {
                                 let pixelPtr = (ptr + bytesPerRow * j).assumingMemoryBound(to: UInt32.self) + i
+                                let db = freqBuffer[min(freqBuffer.count - 1, Int(round(corr * pow(Float(j), exp))))]
                                 let level = max(0, db / 120 + 1)
                                 let intLevel = UInt32(level * 255)
                                 pixelPtr.pointee = intLevel << 16 | intLevel << 8 | intLevel | 0xff000000
