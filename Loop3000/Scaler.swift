@@ -111,15 +111,17 @@ class Scaler {
                 let height = CVPixelBufferGetHeight($1)
                 return width == constraint.pixelsWide && height == constraint.pixelsHigh
             }
-        for (i, buffer) in zip(
-            canDenoise.map { $0.0 },
-            await withCheckedContinuation { continuation in DispatchQueue.global().async {
-                continuation.resume(returning: try! self.denoiser.predictions(
-                    inputs: canDenoise.map { DRUNetColorInput(inputImage: $1, noiseLevel: try! MLMultiArray([Float(8)])) }
-                ))
-            }}.map { $0.outputImage }
-        ) {
-            denoisedBuffers[i] = buffer
+        if !canDenoise.isEmpty {
+            for (i, buffer) in zip(
+                canDenoise.map { $0.0 },
+                await withCheckedContinuation { continuation in DispatchQueue.global().async {
+                    continuation.resume(returning: try! self.denoiser.predictions(
+                        inputs: canDenoise.map { DRUNetColorInput(inputImage: $1, noiseLevel: try! MLMultiArray([Float(8)])) }
+                    ))
+                }}.map { $0.outputImage }
+            ) {
+                denoisedBuffers[i] = buffer
+            }
         }
         let outputImages = denoisedBuffers.map { buffer in
             CIImage(cvPixelBuffer: buffer, options: [.colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!])
