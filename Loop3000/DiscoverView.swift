@@ -40,7 +40,7 @@ struct DiscoverView: View {
                     }
                     Spacer()
                 } else {
-                    List(model.musicLibrary.requesting.dropDuplicates()) { url in
+                    List(model.musicLibrary.requesting.removingDuplicates()) { url in
                         HStack(spacing: 8) {
                             ProgressView().scaleEffect(0.5)
                             Text(url.pathDescription)

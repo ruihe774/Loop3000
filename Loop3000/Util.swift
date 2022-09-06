@@ -119,7 +119,7 @@ extension Array where Element: Identifiable {
         first { $0.id == id }
     }
 
-    func dropDuplicates() -> Self {
+    func removingDuplicates() -> Self {
         var r: Self = []
         var s: Set<Element.ID> = []
         for elem in self {
