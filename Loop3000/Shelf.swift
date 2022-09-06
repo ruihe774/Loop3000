@@ -723,12 +723,12 @@ fileprivate func mergeAlbums(_ a: Album, _ tracksA: [Track], _ b: Album, _ track
             guard trackA.metadata[\.organization] == trackB.metadata[\.organization] else {
                 return true
             }
-            guard trackA.metadata[\.date] == trackB.metadata[\.date] else {
-                return true
-            }
-            guard trackA.metadata["YEAR"] == trackB.metadata["YEAR"] else {
-                return true
-            }
+//            guard trackA.metadata[\.date] == trackB.metadata[\.date] else {
+//                return true
+//            }
+//            guard trackA.metadata["YEAR"] == trackB.metadata["YEAR"] else {
+//                return true
+//            }
             return false
         }) {
             return nil
