@@ -1146,7 +1146,7 @@ class CGImageArtworkLoader: ArtworkLoader {
         await choker?.add(url)
         defer { choker?.remove(url) }
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
-        guard let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return nil }
+        guard let image = CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary) else { return nil }
         return image
     }
 }
