@@ -1,0 +1,19 @@
+Target dependency graph (8 targets)
+_AtomicsShims in swift-atomics, no dependencies
+Atomics in swift-atomics, depends on:
+_AtomicsShims in swift-atomics (explicit)
+Atomics in swift-atomics, depends on:
+Atomics in swift-atomics (explicit)
+_AtomicsShims in swift-atomics (explicit)
+DequeModule in swift-collections, no dependencies
+OrderedCollections in swift-collections, no dependencies
+Collections in swift-collections, depends on:
+DequeModule in swift-collections (explicit)
+OrderedCollections in swift-collections (explicit)
+Collections in swift-collections, depends on:
+Collections in swift-collections (explicit)
+DequeModule in swift-collections (explicit)
+OrderedCollections in swift-collections (explicit)
+Loop3000 in Loop3000, depends on:
+Atomics in swift-atomics (explicit)
+Collections in swift-collections (explicit)

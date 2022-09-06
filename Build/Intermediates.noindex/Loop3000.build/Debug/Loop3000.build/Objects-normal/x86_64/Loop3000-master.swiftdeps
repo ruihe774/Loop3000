@@ -1,0 +1,20 @@
+version: "Apple Swift version 5.7 (swiftlang-5.7.0.123.8 clang-1400.0.29.50)"
+options: "8b76b0ced11555757b201171ccebe5d85b1e71760dee9e7135a801a470008c8e"
+build_start_time: [1662433001, 695866107]
+build_end_time: [1662433004, 914047002]
+inputs:
+  ? "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/Loop3000.build/Debug/Loop3000.build/DerivedSources/CoreMLGenerated/DRUNetColor/DRUNetColor.swift"
+  : [1662433001, 649185895]
+  "/Users/zhangziyue/Desktop/code/swift/Loop3000/Loop3000/App.swift": [1662358539, 0]
+  "/Users/zhangziyue/Desktop/code/swift/Loop3000/Loop3000/BufferStatisticsView.swift": [1662298530, 0]
+  "/Users/zhangziyue/Desktop/code/swift/Loop3000/Loop3000/DiscoverView.swift": [1662372299, 0]
+  "/Users/zhangziyue/Desktop/code/swift/Loop3000/Loop3000/MainView.swift": [1662278960, 0]
+  "/Users/zhangziyue/Desktop/code/swift/Loop3000/Loop3000/Model.swift": [1662403076, 564409017]
+  "/Users/zhangziyue/Desktop/code/swift/Loop3000/Loop3000/Playback.swift": [1662400964, 405011653]
+  "/Users/zhangziyue/Desktop/code/swift/Loop3000/Loop3000/PlayerView.swift": [1662433001, 122685909]
+  "/Users/zhangziyue/Desktop/code/swift/Loop3000/Loop3000/PlaylistView.swift": [1662313410, 0]
+  "/Users/zhangziyue/Desktop/code/swift/Loop3000/Loop3000/Scaler.swift": [1661856431, 0]
+  "/Users/zhangziyue/Desktop/code/swift/Loop3000/Loop3000/Shelf.swift": [1662120800, 0]
+  "/Users/zhangziyue/Desktop/code/swift/Loop3000/Loop3000/SidebarView.swift": [1661912740, 0]
+  "/Users/zhangziyue/Desktop/code/swift/Loop3000/Loop3000/SpectrumView.swift": [1662372306, 0]
+  "/Users/zhangziyue/Desktop/code/swift/Loop3000/Loop3000/Util.swift": [1662106143, 0]

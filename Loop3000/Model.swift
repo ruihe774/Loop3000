@@ -614,6 +614,10 @@ class AppModel: ObservableObject {
         alertModel.message = message
         alertModel.isPresented = true
     }
+	
+	func setVol(to userVolume: Float) {
+		player.setVolume(to: userVolume)
+	}
 
     func play(_ piece: MusicPiece) {
         playingPiece = piece

@@ -255,6 +255,17 @@ class PlaybackScheduler {
             self.bufferedForNextTrack = .zero
         }
     }
+	
+	func setVolume(to userVolume: Float) {
+		if userVolume == 0 {
+			self.renderer.isMuted = true
+		} else {
+			self.renderer.isMuted = false
+		}
+		playbackQueue.async {
+			self.renderer.volume = userVolume
+		}
+	}
 }
 
 class AVDecoder: AudioDecoder {

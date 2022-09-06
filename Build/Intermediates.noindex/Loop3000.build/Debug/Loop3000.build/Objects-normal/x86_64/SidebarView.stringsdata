@@ -1,0 +1,20 @@
+{
+  "source": "/Users/zhangziyue/Desktop/code/swift/Loop3000/Loop3000/SidebarView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Search"
+      },
+      {
+        "comment": "",
+        "key": "Playlists"
+      },
+      {
+        "comment": "",
+        "key": "Albums"
+      }
+    ]
+  },
+  "version": 1
+}

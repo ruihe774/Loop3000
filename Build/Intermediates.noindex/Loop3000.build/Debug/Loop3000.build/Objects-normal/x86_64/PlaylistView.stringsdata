@@ -1,0 +1,24 @@
+{
+  "source": "/Users/zhangziyue/Desktop/code/swift/Loop3000/Loop3000/PlaylistView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Paused"
+      },
+      {
+        "comment": "",
+        "key": "Playing"
+      },
+      {
+        "comment": "",
+        "key": "Track"
+      },
+      {
+        "comment": "",
+        "key": "Cover Artwork"
+      }
+    ]
+  },
+  "version": 1
+}

@@ -1,0 +1,7 @@
+version: "Apple Swift version 5.7 (swiftlang-5.7.0.123.8 clang-1400.0.29.50)"
+options: "8590abe5d45a6fc340ec11429171d9c714b89b2c4166725531a101ec2d93dab8"
+build_start_time: [1662376487, 75587987]
+build_end_time: [1662376487, 115391969]
+inputs:
+  ? "/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/SourcePackages/checkouts/swift-collections/Sources/Collections/Collections.swift"
+  : !private [1662373558, 14931678]

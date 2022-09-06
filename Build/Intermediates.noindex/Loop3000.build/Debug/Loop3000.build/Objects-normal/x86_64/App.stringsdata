@@ -1,0 +1,32 @@
+{
+  "source": "/Users/zhangziyue/Desktop/code/swift/Loop3000/Loop3000/App.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Alert"
+      },
+      {
+        "comment": "",
+        "key": "Buffer Statistics"
+      },
+      {
+        "comment": "",
+        "key": "Spectrum"
+      },
+      {
+        "comment": "",
+        "key": "Discover Music"
+      },
+      {
+        "comment": "",
+        "key": "Acknowledgments"
+      },
+      {
+        "comment": "",
+        "key": "Close"
+      }
+    ]
+  },
+  "version": 1
+}

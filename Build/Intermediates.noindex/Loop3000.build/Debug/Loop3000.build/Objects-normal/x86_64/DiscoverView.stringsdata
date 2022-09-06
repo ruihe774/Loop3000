@@ -1,0 +1,24 @@
+{
+  "source": "/Users/zhangziyue/Desktop/code/swift/Loop3000/Loop3000/DiscoverView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Imported music"
+      },
+      {
+        "comment": "",
+        "key": "Encountered errors"
+      },
+      {
+        "comment": "",
+        "key": "Your music library is up to date."
+      },
+      {
+        "comment": "",
+        "key": "OK"
+      }
+    ]
+  },
+  "version": 1
+}

@@ -1,0 +1,20 @@
+"/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/SourcePackages/checkouts/swift-collections/Sources/OrderedCollections/HashTable/_HashTable+CustomStringConvertible.swift":
+  swift-dependencies: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_HashTable+CustomStringConvertible.swiftdeps"
+  diagnostics: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_HashTable+CustomStringConvertible.dia"
+  dependencies: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_HashTable+CustomStringConvertible.d"
+  object: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_HashTable+CustomStringConvertible.o"
+"/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/SourcePackages/checkouts/swift-collections/Sources/OrderedCollections/HashTable/_HashTable+BucketIterator.swift":
+  dependencies: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_HashTable+BucketIterator.d"
+  diagnostics: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_HashTable+BucketIterator.dia"
+  object: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_HashTable+BucketIterator.o"
+  swift-dependencies: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_HashTable+BucketIterator.swiftdeps"
+"/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/SourcePackages/checkouts/swift-collections/Sources/OrderedCollections/HashTable/_HashTable+Bucket.swift":
+  dependencies: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_HashTable+Bucket.d"
+  diagnostics: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_HashTable+Bucket.dia"
+  object: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_HashTable+Bucket.o"
+  swift-dependencies: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_HashTable+Bucket.swiftdeps"
+"/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/SourcePackages/checkouts/swift-collections/Sources/OrderedCollections/HashTable/_HashTable+Constants.swift":
+  object: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_HashTable+Constants.o"
+  diagnostics: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_HashTable+Constants.dia"
+  dependencies: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_HashTable+Constants.d"
+  swift-dependencies: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_HashTable+Constants.swiftdeps"

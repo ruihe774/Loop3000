@@ -1,0 +1,43 @@
+version: "Apple Swift version 5.7 (swiftlang-5.7.0.123.8 clang-1400.0.29.50)"
+options: "d6a337b72311b32ac28c6f5e1aa2e40bce3f68c91bd669b1613f89d6651d456e"
+build_start_time: [1662376484, 869915962]
+build_end_time: [1662376484, 999969959]
+inputs:
+  ? "/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/SourcePackages/checkouts/swift-collections/Sources/DequeModule/Compatibility.swift"
+  : !private [1662373558, 15308856]
+  ? "/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/SourcePackages/checkouts/swift-collections/Sources/DequeModule/Deque+Codable.swift"
+  : !private [1662373558, 15530347]
+  ? "/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/SourcePackages/checkouts/swift-collections/Sources/DequeModule/Deque+Collection.swift"
+  : !private [1662373558, 15956401]
+  ? "/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/SourcePackages/checkouts/swift-collections/Sources/DequeModule/Deque+CustomDebugStringConvertible.swift"
+  : !private [1662373558, 16114234]
+  ? "/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/SourcePackages/checkouts/swift-collections/Sources/DequeModule/Deque+CustomReflectable.swift"
+  : !private [1662373558, 16317367]
+  ? "/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/SourcePackages/checkouts/swift-collections/Sources/DequeModule/Deque+CustomStringConvertible.swift"
+  : !private [1662373558, 16465663]
+  ? "/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/SourcePackages/checkouts/swift-collections/Sources/DequeModule/Deque+Equatable.swift"
+  : !private [1662373558, 16582012]
+  ? "/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/SourcePackages/checkouts/swift-collections/Sources/DequeModule/Deque+ExpressibleByArrayLiteral.swift"
+  : !private [1662373558, 16713142]
+  ? "/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/SourcePackages/checkouts/swift-collections/Sources/DequeModule/Deque+Extras.swift"
+  : !private [1662373558, 16962528]
+  ? "/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/SourcePackages/checkouts/swift-collections/Sources/DequeModule/Deque+Hashable.swift"
+  : !private [1662373558, 17088413]
+  ? "/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/SourcePackages/checkouts/swift-collections/Sources/DequeModule/Deque+Testing.swift"
+  : !private [1662373558, 17211914]
+  ? "/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/SourcePackages/checkouts/swift-collections/Sources/DequeModule/Deque._Storage.swift"
+  : !private [1662373558, 17626762]
+  ? "/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/SourcePackages/checkouts/swift-collections/Sources/DequeModule/Deque._UnsafeHandle.swift"
+  : !private [1662373558, 17853975]
+  ? "/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/SourcePackages/checkouts/swift-collections/Sources/DequeModule/Deque.swift"
+  : !private [1662373558, 18007755]
+  ? "/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/SourcePackages/checkouts/swift-collections/Sources/DequeModule/UnsafeMutableBufferPointer+Utilities.swift"
+  : !private [1662373558, 18130302]
+  ? "/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/SourcePackages/checkouts/swift-collections/Sources/DequeModule/_DequeBuffer.swift"
+  : !private [1662373558, 18345355]
+  ? "/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/SourcePackages/checkouts/swift-collections/Sources/DequeModule/_DequeBufferHeader.swift"
+  : !private [1662373558, 18567562]
+  ? "/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/SourcePackages/checkouts/swift-collections/Sources/DequeModule/_DequeSlot.swift"
+  : !private [1662373558, 18705368]
+  ? "/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/SourcePackages/checkouts/swift-collections/Sources/DequeModule/_UnsafeWrappedBuffer.swift"
+  : !private [1662373558, 18941879]

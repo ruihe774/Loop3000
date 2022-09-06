@@ -1,0 +1,80 @@
+[
+  {
+    "shortDescription" : "Plug-and-Play Image Restoration with Deep Denoiser Prior (RGB)",
+    "metadataOutputVersion" : "3.0",
+    "outputSchema" : [
+      {
+        "height" : "600",
+        "colorspace" : "RGB",
+        "isOptional" : "0",
+        "width" : "600",
+        "isColor" : "1",
+        "formattedType" : "Image (Color 600 × 600)",
+        "hasSizeFlexibility" : "0",
+        "type" : "Image",
+        "shortDescription" : "",
+        "name" : "outputImage"
+      }
+    ],
+    "version" : "--",
+    "modelParameters" : [
+
+    ],
+    "author" : "Kai Zhang, Yawei Li, Wangmeng Zuo, Lei Zhang, Luc Van Gool, Radu Timofte",
+    "specificationVersion" : 7,
+    "storagePrecision" : "Float16",
+    "license" : "MIT License",
+    "mlProgramOperationTypeHistogram" : {
+      "Concat" : 1,
+      "Ios16.add" : 32,
+      "Ios16.conv" : 61,
+      "Ios16.convTranspose" : 3,
+      "Ios16.relu" : 28,
+      "Tile" : 1,
+      "Ios16.constexprAffineDequantize" : 63,
+      "Ios16.reshape" : 1,
+      "Ios16.cast" : 3
+    },
+    "computePrecision" : "Mixed (Float16, Float32, Int32)",
+    "isUpdatable" : "0",
+    "availability" : {
+      "macOS" : "13.0",
+      "tvOS" : "16.0",
+      "watchOS" : "9.0",
+      "iOS" : "16.0",
+      "macCatalyst" : "16.0"
+    },
+    "modelType" : {
+      "name" : "MLModelType_mlProgram"
+    },
+    "inputSchema" : [
+      {
+        "height" : "600",
+        "colorspace" : "RGB",
+        "isOptional" : "0",
+        "width" : "600",
+        "isColor" : "1",
+        "formattedType" : "Image (Color 600 × 600)",
+        "hasSizeFlexibility" : "0",
+        "type" : "Image",
+        "shortDescription" : "",
+        "name" : "inputImage"
+      },
+      {
+        "hasShapeFlexibility" : "0",
+        "isOptional" : "0",
+        "dataType" : "Float32",
+        "formattedType" : "MultiArray (Float32 1)",
+        "shortDescription" : "",
+        "shape" : "[1]",
+        "name" : "noiseLevel",
+        "type" : "MultiArray"
+      }
+    ],
+    "userDefinedMetadata" : {
+
+    },
+    "generatedClassName" : "DRUNetColor",
+    "method" : "predict"
+  }
+]

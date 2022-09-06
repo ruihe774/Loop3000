@@ -33,6 +33,9 @@ struct PlayerView: View {
     private var targetTimestamp: CueTime {
         CueTime(value: Int(Double(duration) * sliderValue))
     }
+	
+	@State var userVolume:Float = 1.0
+	@State var volumeEditing = false
 
     var body: some View {
         HStack {
@@ -88,6 +91,15 @@ struct PlayerView: View {
                     }
                 }
                 .disabled(model.playbackState == .stopped)
+			Divider()
+			Slider(value: $userVolume, in: 0.0...1.0, onEditingChanged: { volumeEditing = $0 })
+				.frame(maxWidth: 100)
+				.onChange(of: volumeEditing, perform: { volumeEditing in
+					if !volumeEditing {
+						model.setVol(to: userVolume)
+					}
+				})
+				
         }
         .frame(height: 25)
         .scenePadding([.leading, .trailing])

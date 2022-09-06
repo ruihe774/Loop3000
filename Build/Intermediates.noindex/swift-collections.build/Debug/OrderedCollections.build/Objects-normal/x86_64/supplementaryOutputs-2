@@ -1,0 +1,20 @@
+"/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/SourcePackages/checkouts/swift-collections/Sources/OrderedCollections/HashTable/_Hashtable+Header.swift":
+  swift-dependencies: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_Hashtable+Header.swiftdeps"
+  dependencies: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_Hashtable+Header.d"
+  diagnostics: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_Hashtable+Header.dia"
+  object: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_Hashtable+Header.o"
+"/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/SourcePackages/checkouts/swift-collections/Sources/OrderedCollections/HashTable/_HashTable+UnsafeHandle.swift":
+  diagnostics: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_HashTable+UnsafeHandle.dia"
+  dependencies: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_HashTable+UnsafeHandle.d"
+  swift-dependencies: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_HashTable+UnsafeHandle.swiftdeps"
+  object: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_HashTable+UnsafeHandle.o"
+"/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/SourcePackages/checkouts/swift-collections/Sources/OrderedCollections/HashTable/_HashTable.swift":
+  diagnostics: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_HashTable.dia"
+  dependencies: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_HashTable.d"
+  swift-dependencies: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_HashTable.swiftdeps"
+  object: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_HashTable.o"
+"/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/SourcePackages/checkouts/swift-collections/Sources/OrderedCollections/HashTable/_HashTable+Testing.swift":
+  object: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_HashTable+Testing.o"
+  diagnostics: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_HashTable+Testing.dia"
+  dependencies: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_HashTable+Testing.d"
+  swift-dependencies: "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/swift-collections.build/Debug/OrderedCollections.build/Objects-normal/x86_64/_HashTable+Testing.swiftdeps"

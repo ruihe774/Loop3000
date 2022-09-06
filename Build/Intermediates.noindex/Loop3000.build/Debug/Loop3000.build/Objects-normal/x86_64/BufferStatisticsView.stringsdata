@@ -1,0 +1,16 @@
+{
+  "source": "/Users/zhangziyue/Desktop/code/swift/Loop3000/Loop3000/BufferStatisticsView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Sample Time"
+      },
+      {
+        "comment": "",
+        "key": "Seconds Buffered"
+      }
+    ]
+  },
+  "version": 1
+}

@@ -1,0 +1,24 @@
+{
+  "source": "/Users/zhangziyue/Desktop/code/swift/Loop3000/Loop3000/PlayerView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Play previous track"
+      },
+      {
+        "comment": "",
+        "key": "Pause"
+      },
+      {
+        "comment": "",
+        "key": "Play"
+      },
+      {
+        "comment": "",
+        "key": "Play next track"
+      }
+    ]
+  },
+  "version": 1
+}

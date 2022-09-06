@@ -23,10 +23,10 @@
 		669C586128A47B4D0038A986 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 669C586028A47B4D0038A986 /* App.swift */; };
 		669C586328A47B4D0038A986 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 669C586228A47B4D0038A986 /* MainView.swift */; };
 		669C586528A47B4E0038A986 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 669C586428A47B4E0038A986 /* Assets.xcassets */; };
-		66AE187A28B666AE00DE637A /* Collections in Frameworks */ = {isa = PBXBuildFile; productRef = 66AE187928B666AE00DE637A /* Collections */; };
 		66AE611728B41C6100F04DF5 /* Playback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66AE611628B41C6100F04DF5 /* Playback.swift */; };
 		66B583FB28C4C8E100F04C97 /* SpectrumView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66B583FA28C4C8E100F04C97 /* SpectrumView.swift */; };
-		66C0EB1728BFDEF500DDB219 /* Atomics in Frameworks */ = {isa = PBXBuildFile; productRef = 66C0EB1628BFDEF500DDB219 /* Atomics */; };
+		7B2E114828C6117600791CBB /* Atomics in Frameworks */ = {isa = PBXBuildFile; productRef = 7B2E114728C6117600791CBB /* Atomics */; };
+		7B2E114B28C611A000791CBB /* Collections in Frameworks */ = {isa = PBXBuildFile; productRef = 7B2E114A28C611A000791CBB /* Collections */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -59,10 +59,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				66AE187A28B666AE00DE637A /* Collections in Frameworks */,
+				7B2E114828C6117600791CBB /* Atomics in Frameworks */,
 				666BD94F28B04303006E0408 /* libogg.a in Frameworks */,
+				7B2E114B28C611A000791CBB /* Collections in Frameworks */,
 				666BD95028B04303006E0408 /* libFLAC.a in Frameworks */,
-				66C0EB1728BFDEF500DDB219 /* Atomics in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -138,8 +138,8 @@
 			);
 			name = Loop3000;
 			packageProductDependencies = (
-				66AE187928B666AE00DE637A /* Collections */,
-				66C0EB1628BFDEF500DDB219 /* Atomics */,
+				7B2E114728C6117600791CBB /* Atomics */,
+				7B2E114A28C611A000791CBB /* Collections */,
 			);
 			productName = Loop3000;
 			productReference = 669C585D28A47B4D0038A986 /* Loop3000.app */;
@@ -171,8 +171,8 @@
 			);
 			mainGroup = 669C585428A47B4D0038A986;
 			packageReferences = (
-				66AE187828B666AE00DE637A /* XCRemoteSwiftPackageReference "swift-collections" */,
-				66C0EB1528BFDEF500DDB219 /* XCRemoteSwiftPackageReference "swift-atomics" */,
+				7B2E114628C6117600791CBB /* XCRemoteSwiftPackageReference "swift-atomics" */,
+				7B2E114928C611A000791CBB /* XCRemoteSwiftPackageReference "swift-collections" */,
 			);
 			productRefGroup = 669C585E28A47B4D0038A986 /* Products */;
 			projectDirPath = "";
@@ -420,17 +420,17 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		66AE187828B666AE00DE637A /* XCRemoteSwiftPackageReference "swift-collections" */ = {
+		7B2E114628C6117600791CBB /* XCRemoteSwiftPackageReference "swift-atomics" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/apple/swift-collections.git";
+			repositoryURL = "https://github.com/apple/swift-atomics.git";
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 1.0.0;
 			};
 		};
-		66C0EB1528BFDEF500DDB219 /* XCRemoteSwiftPackageReference "swift-atomics" */ = {
+		7B2E114928C611A000791CBB /* XCRemoteSwiftPackageReference "swift-collections" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/apple/swift-atomics.git";
+			repositoryURL = "https://github.com/apple/swift-collections.git";
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 1.0.0;
@@ -439,15 +439,15 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		66AE187928B666AE00DE637A /* Collections */ = {
+		7B2E114728C6117600791CBB /* Atomics */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 66AE187828B666AE00DE637A /* XCRemoteSwiftPackageReference "swift-collections" */;
-			productName = Collections;
-		};
-		66C0EB1628BFDEF500DDB219 /* Atomics */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 66C0EB1528BFDEF500DDB219 /* XCRemoteSwiftPackageReference "swift-atomics" */;
+			package = 7B2E114628C6117600791CBB /* XCRemoteSwiftPackageReference "swift-atomics" */;
 			productName = Atomics;
+		};
+		7B2E114A28C611A000791CBB /* Collections */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7B2E114928C611A000791CBB /* XCRemoteSwiftPackageReference "swift-collections" */;
+			productName = Collections;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

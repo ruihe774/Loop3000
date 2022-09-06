@@ -19,7 +19,6 @@ struct DiscoverView: View {
         model.musicLibrary.sorted(tracks: model.musicLibrary.importedTracks)
     }
 
-    @State private var uniqueRequesting: [URL] = []
     @State private var processing = false
 
     var body: some View {
@@ -32,10 +31,7 @@ struct DiscoverView: View {
                         refreshTick += 1
                     })
                 Divider()
-                    .onAnimatedValue(of: model.musicLibrary.requesting) { requesting in
-                        uniqueRequesting = requesting.dropDuplicates()
-                    }
-                if uniqueRequesting.isEmpty {
+                if model.musicLibrary.requesting.isEmpty {
                     Spacer()
                     HStack {
                         Spacer()
@@ -44,7 +40,7 @@ struct DiscoverView: View {
                     }
                     Spacer()
                 } else {
-                    List(uniqueRequesting) { url in
+                    List(model.musicLibrary.requesting.dropDuplicates()) { url in
                         HStack(spacing: 8) {
                             ProgressView().scaleEffect(0.5)
                             Text(url.pathDescription)

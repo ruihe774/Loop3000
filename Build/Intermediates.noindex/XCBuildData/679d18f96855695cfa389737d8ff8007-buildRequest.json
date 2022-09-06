@@ -1,0 +1,57 @@
+{
+  "_buildCommand2" : {
+    "command" : "build",
+    "skipDependencies" : false,
+    "style" : "buildOnly"
+  },
+  "buildCommand" : "build",
+  "configuredTargets" : [
+    {
+      "guid" : "26c1ee887662a2bd29bba545302945e92534566d022d88a9f639c1e8a19d7dc1"
+    }
+  ],
+  "containerPath" : "/Users/zhangziyue/Desktop/code/swift/Loop3000/Loop3000.xcodeproj",
+  "continueBuildingAfterErrors" : false,
+  "enableIndexBuildArena" : false,
+  "hideShellScriptEnvironment" : false,
+  "parameters" : {
+    "action" : "build",
+    "activeArchitecture" : "x86_64",
+    "activeRunDestination" : {
+      "disableOnlyActiveArch" : false,
+      "platform" : "macosx",
+      "sdk" : "macosx13.0",
+      "sdkVariant" : "macos",
+      "supportedArchitectures" : [
+        "x86_64h",
+        "x86_64"
+      ],
+      "targetArchitecture" : "x86_64"
+    },
+    "arenaInfo" : {
+      "buildIntermediatesPath" : "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex",
+      "buildProductsPath" : "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Products",
+      "derivedDataPath" : "/Users/zhangziyue/Library/Developer/Xcode/DerivedData",
+      "indexDataStoreFolderPath" : "/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/Index.noindex/DataStore",
+      "indexEnableDataStore" : true,
+      "indexPCHPath" : "/Users/zhangziyue/Library/Developer/Xcode/DerivedData/Loop3000-eupzuhkqphggiketndxofaagrpvr/Index.noindex/PrecompiledHeaders",
+      "pchPath" : "/Users/zhangziyue/Desktop/code/swift/Loop3000/Build/Intermediates.noindex/PrecompiledHeaders"
+    },
+    "configurationName" : "Debug",
+    "overrides" : {
+      "synthesized" : {
+        "table" : {
+          "ENABLE_PREVIEWS" : "NO"
+        }
+      }
+    }
+  },
+  "qos" : "default",
+  "schemeCommand" : "launch",
+  "schemeCommand2" : "launch",
+  "showNonLoggedProgress" : true,
+  "useDryRun" : false,
+  "useImplicitDependencies" : true,
+  "useLegacyBuildLocations" : false,
+  "useParallelTargets" : true
+}
