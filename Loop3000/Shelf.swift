@@ -1080,55 +1080,57 @@ extension Shelf {
     }
 
     mutating func loadAllArtworks(choker: RequestChoker? = nil) async -> [Error] {
-        let scaler = Scaler.shared()
-        let (images, errors) = await withTaskGroup(of: (Album, CGImage?, Error?).self) { taskGroup in
+        let (albumIds, images, errors) = await withTaskGroup(of: (UUID, Result<CGImage?, Error>).self) { taskGroup in
             for album in albums {
                 if album.cover == nil {
                     let this = self
                     taskGroup.addTask {
-                        do {
-                            return (album, try await this.loadOriginalArtwork(for: album, choker: choker), nil)
-                        } catch let error {
-                            return (album, nil, error)
-                        }
+                        (album.id, await Result {
+                            try await this.loadOriginalArtwork(for: album, choker: choker)
+                        })
                     }
                 }
             }
+            var albumIds: [UUID] = []
+            var images: [CGImage] = []
             var errors: [Error] = []
-            var images: [(Album, CGImage)] = []
-            for await item in taskGroup {
-                item.1.map { images.append((item.0, $0)) }
-                item.2.map { errors.append($0) }
+            for await (id, result) in taskGroup {
+                switch result {
+                case .success(let image) where image != nil:
+                    albumIds.append(id)
+                    images.append(image!)
+                case .failure(let error):
+                    errors.append(error)
+                default:
+                    ()
+                }
             }
-            return (images, errors)
+            return (albumIds, images, errors)
         }
-        let originalImages = images.map { $0.1 }
-        let scaledImages = await scaler.scaleAndDenoise(images: originalImages.map { CIImage(cgImage: $0) }, to: originalImages.map { image in
-            let newWidth = 600
-            var newHeight = image.height * 600 / image.width
-            if newHeight >= 595 && newHeight <= 605 {
-                newHeight = 600
-            }
-            return Scaler.Resolution(width: newWidth, height: newHeight)
-        })
-        let cictx = scaler.cictx
-        await withTaskGroup(of: (Album, Data).self) { taskGroup in
-            for (album, image) in zip(images.map { $0.0 }, scaledImages) {
+        let scaledImages = images.map { image in
+            let newWidth = min(600, image.width)
+            let scaleRatio = CGFloat(newWidth) / CGFloat(image.width)
+            return CIImage(cgImage: image).transformed(
+                by: .init(scaleX: scaleRatio, y: scaleRatio),
+                highQualityDownsample: true
+            )
+        }
+        let cictx = CIContext()
+        await withTaskGroup(of: (UUID, Data).self) { taskGroup in
+            for (albumId, image) in zip(albumIds, scaledImages) {
                 taskGroup.addTask {
-                    await withCheckedContinuation { continuation in
-                        DispatchQueue.global().async {
-                            continuation.resume(returning: (album, cictx.heifRepresentation(
-                                of: image,
-                                format: .BGRA8,     // I did not figure out what this argument means.
-                                colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                options: [.init(rawValue: kCGImageDestinationLossyCompressionQuality as String): 0.75]
-                            )!))
-                        }
+                    await DispatchQueue.global().swiftAsync {
+                        (albumId, cictx.heifRepresentation(
+                            of: image,
+                            format: .BGRA8,     // I did not figure out what this argument means.
+                            colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
+                            options: [.init(rawValue: kCGImageDestinationLossyCompressionQuality as String): 0.75]
+                        )!)
                     }
                 }
             }
-            for await (album, cover) in taskGroup {
-                albums[albums.firstIndex(of: album)!].cover = cover
+            for await (albumId, cover) in taskGroup {
+                albums.modifyFirst { $0.id == albumId } modifier: { $0.cover = cover }
             }
         }
         return errors

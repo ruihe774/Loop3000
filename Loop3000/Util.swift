@@ -143,6 +143,15 @@ extension Array {
             }
         }
     }
+
+    mutating func modifyFirst(where pred: (Element) -> Bool = { _ in true }, modifier: (inout Element) throws -> ()) rethrows {
+        for i in 0 ..< count {
+            if pred(self[i]) {
+                try modifier(&self[i])
+                break
+            }
+        }
+    }
 }
 
 extension URL {
@@ -342,6 +351,16 @@ extension Task {
             channel.send(await self.result)
         }
         return try channel.wait().get()
+    }
+}
+
+extension Result where Failure == Error {
+    init(catching f: () async throws -> Success) async {
+        do {
+            self = .success(try await f())
+        } catch let error {
+            self = .failure(error)
+        }
     }
 }
 

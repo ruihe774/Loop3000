@@ -173,9 +173,6 @@ class MusicLibrary: ObservableObject {
     }
 
     func prepareDiscover() {
-        DispatchQueue.global(qos: .utility).async {
-            let _ = Scaler.shared()
-        }
     }
 
     func sorted(albums: [Album]) -> [Album] {

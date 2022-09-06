@@ -1,6 +1,0 @@
-{
-  "MLModelVersionStringKey" : "--",
-  "MLModelDescriptionKey" : "Plug-and-Play Image Restoration with Deep Denoiser Prior (RGB)",
-  "MLModelAuthorKey" : "Kai Zhang, Yawei Li, Wangmeng Zuo, Lei Zhang, Luc Van Gool, Radu Timofte",
-  "MLModelLicenseKey" : "MIT License"
-}
