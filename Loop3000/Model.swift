@@ -207,22 +207,24 @@ class MusicLibrary: ObservableObject {
             }
     }
 
-    func activate(url: URL) {
-        guard let bookmark = shelf.getBookmark(normalizedURL: url.normalizedURL) else { return }
-        guard let loadedURL = try? loadURLFromBookmark(bookmark) else { return }
-        assert(url.normalizedURL == loadedURL.normalizedURL)
-    }
-
-    nonisolated func activateFromOtherThread(url: URL) {
-        precondition(!Thread.isMainThread)
-        var bookmark: Data?
-        let normalizedURL = url.normalizedURL
-        DispatchQueue.main.sync {
-            bookmark = shelf.getBookmark(normalizedURL: normalizedURL)
+    func startAccess(url: URL) async throws -> URL {
+        assert(url.normalizedURL == url)
+        guard let bookmark = shelf.discoverLog.items.first(where: { $0.url == url })?.bookmark else {
+            throw FileNotFound(url: url)
         }
-        guard let bookmark else { return }
-        guard let loadedURL = try? loadURLFromBookmark(bookmark) else { return }
-        assert(url.normalizedURL == loadedURL.normalizedURL)
+        let (loadedURL, newBookmark) = try await DispatchQueue.global().swiftAsync {
+            var bookmark = bookmark
+            let url = try loadURLFromBookmark(&bookmark)
+            return (url, bookmark)
+        }
+        shelf.discoverLog.items.modifyEach { $0.url == url } modifier: {
+            $0.url = loadedURL
+            $0.bookmark = newBookmark
+        }
+        shelf.tracks.modifyEach { $0.source == url } modifier: {
+            $0.source = loadedURL
+        }
+        return loadedURL
     }
 }
 
@@ -462,7 +464,7 @@ class AppModel: ObservableObject {
             self.model = model
         }
 
-        func request(nextOf track: Track?) -> Track? {
+        func request(nextOf track: Track?) throws -> Track? {
             var nextTrack: Track?
             DispatchQueue.main.sync {
                 nextTrack = {
@@ -487,7 +489,15 @@ class AppModel: ObservableObject {
                     return model.musicLibrary.tracks[nextItem.trackId]
                 }()
             }
-            nextTrack.map { model.musicLibrary.activateFromOtherThread(url: $0.source) }
+            guard var nextTrack else { return nil }
+            let source = nextTrack.source
+            nextTrack.source = try Task {
+                try await MainActor.run {
+                    Task {
+                        try await model.musicLibrary.startAccess(url: source)
+                    }
+                }.result.get()
+            }.blockingWait()
             return nextTrack
         }
 

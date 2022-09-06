@@ -136,9 +136,11 @@ extension Array where Element: Identifiable {
 }
 
 extension Array {
-    mutating func modifyEach(_ body: (inout Element) -> ()) {
+    mutating func modifyEach(where pred: (Element) -> Bool = { _ in true }, modifier: (inout Element) throws -> ()) rethrows {
         for i in 0 ..< count {
-            body(&self[i])
+            if pred(self[i]) {
+                try modifier(&self[i])
+            }
         }
     }
 }
@@ -238,17 +240,23 @@ func universalSplit(_ s: String) -> [String] {
         .filter { !$0.isEmpty }
 }
 
-struct BookmarkDataDecodingError: Error {}
+struct SecurityScopedResourceAccessDenied: FileError {
+    let url: URL
+    static let prompt = "Access denied"
+}
 
 func dumpURLToBookmark(_ url: URL) throws -> Data {
     return try url.bookmarkData(options: [.withSecurityScope, .securityScopeAllowOnlyReadAccess])
 }
 
-func loadURLFromBookmark(_ bookmark: Data) throws -> URL {
+func loadURLFromBookmark(_ bookmark: inout Data) throws -> URL {
     var isStale = false
     let url = try URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, bookmarkDataIsStale: &isStale)
-    guard !isStale && url.startAccessingSecurityScopedResource() else {
-        throw BookmarkDataDecodingError()
+    guard url.startAccessingSecurityScopedResource() else {
+        throw SecurityScopedResourceAccessDenied(url: url)
+    }
+    if isStale {
+        bookmark = try dumpURLToBookmark(url)
     }
     return url
 }
@@ -276,6 +284,54 @@ class SerialAsyncQueue {
         if !processing {
             processNext()
         }
+    }
+}
+
+extension DispatchQueue {
+    func swiftAsync<T>(execute f: @Sendable @escaping () -> T) async -> T {
+        await withCheckedContinuation { continuation in
+            self.async {
+                continuation.resume(returning: f())
+            }
+        }
+    }
+
+    func swiftAsync<T>(execute f: @Sendable @escaping () throws -> T) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            self.async {
+                do {
+                    continuation.resume(returning: try f())
+                } catch let error {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+}
+
+extension Task where Failure == Never {
+    func blockingWait() -> Success {
+        let semaphore = DispatchSemaphore(value: 0)
+        var value: Success?
+        Task<(), Never> {
+            value = await self.value
+            semaphore.signal()
+        }
+        semaphore.wait()
+        return value!
+    }
+}
+
+extension Task {
+    func blockingWait() throws -> Success {
+        let semaphore = DispatchSemaphore(value: 0)
+        var result: Result<Success, Failure>?
+        Task<(), Never> {
+            result = await self.result
+            semaphore.signal()
+        }
+        semaphore.wait()
+        return try result!.get()
     }
 }
 

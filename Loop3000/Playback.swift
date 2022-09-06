@@ -40,13 +40,13 @@ func makeAudioDecoder(for track: Track) throws -> any AudioDecoder {
 }
 
 protocol PlaybackDelegate: AnyObject {
-    func request(nextOf: Track?) -> Track?
+    func request(nextOf: Track?) throws -> Track?
     func playbackDidError(error: Error)
     func playbackDidEnqueue(buffer: CMSampleBuffer)
 }
 
 fileprivate class NullPlaybackDelegate: PlaybackDelegate {
-    func request(nextOf: Track?) -> Track? { nil }
+    func request(nextOf: Track?) throws -> Track? { nil }
     func playbackDidError(error: Error) {}
     func playbackDidEnqueue(buffer: CMSampleBuffer) {}
 }
@@ -120,7 +120,7 @@ class PlaybackScheduler {
                 var useCurrent = false
                 if trailingUntil != .invalid {
                     if next == nil {
-                        guard let track = delegate.request(nextOf: current?.0) else {
+                        guard let track = try delegate.request(nextOf: current?.0) else {
                             renderer.stopRequestingMediaData()
                             return
                         }
@@ -143,7 +143,7 @@ class PlaybackScheduler {
                             bufferedForCurrentTrack = bufferedForNextTrack
                             bufferedForNextTrack = .zero
                         } else {
-                            guard let track = delegate.request(nextOf: nil) else {
+                            guard let track = try delegate.request(nextOf: nil) else {
                                 renderer.stopRequestingMediaData()
                                 return
                             }

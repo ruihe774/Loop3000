@@ -264,10 +264,10 @@ struct DiscoverLogItem: Codable {
         case importing
         case grabbing
     }
-    let action: Action
-    let url: URL
-    let bookmark: Data
-    let date: Date
+    var action: Action
+    var url: URL
+    var bookmark: Data
+    var date: Date
 }
 
 struct DiscoverLog: Codable {
@@ -388,14 +388,6 @@ struct Shelf: Codable {
 
     mutating func merge(with other: Shelf) {
         self = mergeShelf(self, other)
-    }
-
-    func getBookmark(normalizedURL: URL) -> Data? {
-        for logItem in discoverLog.items {
-            guard logItem.url == normalizedURL else { continue }
-            return logItem.bookmark
-        }
-        return nil
     }
 }
 
