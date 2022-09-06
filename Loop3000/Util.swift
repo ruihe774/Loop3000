@@ -133,6 +133,14 @@ extension Array where Element: Identifiable {
     }
 }
 
+extension Array {
+    mutating func modifyEach(_ body: (inout Element) -> ()) {
+        for i in 0 ..< count {
+            body(&self[i])
+        }
+    }
+}
+
 extension URL {
     mutating func replacePathExtension(_ pathExtension: String) {
         deletePathExtension()
