@@ -465,31 +465,27 @@ class AppModel: ObservableObject {
         }
 
         func request(nextOf track: Track?) throws -> Track? {
-            var nextTrack: Track?
-            DispatchQueue.main.sync {
-                nextTrack = {
-                    guard let playingPiece = model.playingPiece ?? model.playingPieceBackup else {
-                        return nil
-                    }
-                    guard let list = playingPiece.playlist, let item = playingPiece.playlistItem else {
-                        return playingPiece.track
-                    }
-                    guard let track else {
-                        return playingPiece.track
-                    }
-                    let index = list.items.firstIndex(of: item)!
-                    guard let prevIndex = list.items[index...].firstIndex(where: { $0.trackId == track.id }) else {
-                        return nil
-                    }
-                    guard prevIndex < list.items.count - 1 else {
-                        return nil
-                    }
-                    let nextItem = list.items[prevIndex + 1]
-                    model.playingPieceNext = MusicPiece(nextItem, musicLibrary: model.musicLibrary)
-                    return model.musicLibrary.tracks[nextItem.trackId]
-                }()
-            }
-            guard var nextTrack else { return nil }
+            guard var nextTrack = DispatchQueue.main.sync(execute: { () -> Track? in
+                guard let playingPiece = model.playingPiece ?? model.playingPieceBackup else {
+                    return nil
+                }
+                guard let list = playingPiece.playlist, let item = playingPiece.playlistItem else {
+                    return playingPiece.track
+                }
+                guard let track else {
+                    return playingPiece.track
+                }
+                let index = list.items.firstIndex(of: item)!
+                guard let prevIndex = list.items[index...].firstIndex(where: { $0.trackId == track.id }) else {
+                    return nil
+                }
+                guard prevIndex < list.items.count - 1 else {
+                    return nil
+                }
+                let nextItem = list.items[prevIndex + 1]
+                model.playingPieceNext = MusicPiece(nextItem, musicLibrary: model.musicLibrary)
+                return model.musicLibrary.tracks[nextItem.trackId]
+            }) else { return nil }
             let source = nextTrack.source
             nextTrack.source = try Task {
                 try await MainActor.run {

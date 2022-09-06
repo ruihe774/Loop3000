@@ -309,29 +309,39 @@ extension DispatchQueue {
     }
 }
 
-extension Task where Failure == Never {
-    func blockingWait() -> Success {
-        let semaphore = DispatchSemaphore(value: 0)
-        var value: Success?
-        Task<(), Never> {
-            value = await self.value
-            semaphore.signal()
-        }
+fileprivate class OneshotChannel<T> {
+    var value: T?
+    private let semaphore = DispatchSemaphore(value: 0)
+
+    func send(_ value: T) {
+        assert(self.value == nil)
+        self.value = value
+        semaphore.signal()
+    }
+
+    func wait() -> T {
         semaphore.wait()
         return value!
     }
 }
 
+extension Task where Failure == Never {
+    func blockingWait() -> Success {
+        let channel = OneshotChannel<Success>()
+        Task<(), Never> {
+            channel.send(await self.value)
+        }
+        return channel.wait()
+    }
+}
+
 extension Task {
     func blockingWait() throws -> Success {
-        let semaphore = DispatchSemaphore(value: 0)
-        var result: Result<Success, Failure>?
+        let channel = OneshotChannel<Result<Success, Failure>>()
         Task<(), Never> {
-            result = await self.result
-            semaphore.signal()
+            channel.send(await self.result)
         }
-        semaphore.wait()
-        return try result!.get()
+        return try channel.wait().get()
     }
 }
 
