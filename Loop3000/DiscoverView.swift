@@ -2,7 +2,7 @@ import SwiftUI
 
 extension URL: Identifiable {
     public var id: String {
-        normalizedString
+        absoluteString
     }
 }
 
