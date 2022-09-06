@@ -969,25 +969,25 @@ fileprivate class FLACGrabber: MetadataGrabber {
         await choker?.add(url)
         defer { choker?.remove(url) }
         let invalid = InvalidFormat(url: url)
-        let reader = try FileReader(url: url)
-        if reader.read(count: 4) != Data([0x66, 0x4C, 0x61, 0x43]) { throw invalid }
+        let reader = try FileReader(url: url, bufferSize: 512)
+        if (try? reader.read(count: 4)) != Data([0x66, 0x4C, 0x61, 0x43]) { throw invalid }
         var last = false
         var metadata = Metadata()
         repeat {
-            guard let header = reader.read(count: 4) else { throw invalid }
+            guard let header = try? reader.read(count: 4) else { throw invalid }
             last = (header[0] >> 7) != 0
             let type = header[0] & 0x7f
             let length = Int(header[1]) << 16 | Int(header[2]) << 8 | Int(header[3])
             switch type {
             case 4: // VORBIS_COMMENT
-                guard let vendorStringLength = reader.read(count: 4).map({ parse32bitIntLE($0) }) else { throw invalid }
-                guard let vendorString = reader.read(count: vendorStringLength) else { throw invalid }
+                guard let vendorStringLength = (try? reader.read(count: 4)).map({ parse32bitIntLE($0) }) else { throw invalid }
+                guard let vendorString = try? reader.read(count: vendorStringLength) else { throw invalid }
                 metadata[\.encoder] = String(data: vendorString, encoding: .utf8)
-                guard let vectorLength = reader.read(count: 4).map({ parse32bitIntLE($0) }) else { throw invalid }
+                guard let vectorLength = (try? reader.read(count: 4)).map({ parse32bitIntLE($0) }) else { throw invalid }
                 var totalReadCount = 8 + vendorStringLength
                 for _ in 0 ..< vectorLength {
-                    guard let commentLength = reader.read(count: 4).map({ parse32bitIntLE($0) }) else { throw invalid }
-                    guard let data = reader.read(count: commentLength) else { throw invalid }
+                    guard let commentLength = (try? reader.read(count: 4)).map({ parse32bitIntLE($0) }) else { throw invalid }
+                    guard let data = try? reader.read(count: commentLength) else { throw invalid }
                     totalReadCount += 4 + commentLength
                     guard let comment = String(data: data, encoding: .utf8) else { continue }
                     let parts = comment.split(separator: "=", maxSplits: 2)
@@ -1000,7 +1000,7 @@ fileprivate class FLACGrabber: MetadataGrabber {
                 // We got what we need
                 last = true
             default:
-                guard reader.skip(count: length) else { throw invalid }
+                do { try reader.skip(count: length) } catch { throw invalid }
             }
         } while !last
         return metadata
@@ -1158,30 +1158,29 @@ class FLACArtworkLoader: ArtworkLoader {
         await choker?.add(url)
         defer { choker?.remove(url) }
         let invalid = InvalidFormat(url: url)
-        let reader = try FileReader(url: url)
-        if reader.read(count: 4) != Data([0x66, 0x4C, 0x61, 0x43]) { throw invalid }
+        let reader = try FileReader(url: url, bufferSize: 512)
+        if (try? reader.read(count: 4)) != Data([0x66, 0x4C, 0x61, 0x43]) { throw invalid }
         var last = false
         repeat {
-            guard let header = reader.read(count: 4) else { throw invalid }
+            guard let header = try? reader.read(count: 4) else { throw invalid }
             last = (header[0] >> 7) != 0
             let type = header[0] & 0x7f
             let length = Int(header[1]) << 16 | Int(header[2]) << 8 | Int(header[3])
             switch type {
             case 6: // PICTURE
-                guard let pictureType = reader.read(count: 4).map({ parse32bitIntBE($0) }) else { throw invalid }
+                guard let pictureType = (try? reader.read(count: 4)).map({ parse32bitIntBE($0) }) else { throw invalid }
                 if pictureType != 3 {
-                    guard reader.read(count: length - 4) != nil else { throw invalid }
+                    do { try reader.skip(count: length - 4) } catch { throw invalid }
                 } else {
                     // Cover (front)
-                    guard let mimeLength = reader.read(count: 4).map({ parse32bitIntBE($0) }) else { throw invalid }
-                    guard let mime = reader.read(count: mimeLength)
+                    guard let mimeLength = (try? reader.read(count: 4)).map({ parse32bitIntBE($0) }) else { throw invalid }
+                    guard let mime = (try? reader.read(count: mimeLength))
                         .flatMap({ String(data: $0, encoding: .ascii) })
                     else { throw invalid }
-                    guard let descLength = reader.read(count: 4).map({ parse32bitIntBE($0) }) else { throw invalid }
-                    guard reader.read(count: descLength) != nil else { throw invalid }
-                    guard reader.read(count: 16) != nil else { throw invalid }
-                    guard let dataLength = reader.read(count: 4).map({ parse32bitIntBE($0) }) else { throw invalid }
-                    guard let imageData = reader.read(count: dataLength) else { throw invalid }
+                    guard let descLength = (try? reader.read(count: 4)).map({ parse32bitIntBE($0) }) else { throw invalid }
+                    do { try reader.skip(count: descLength + 16) } catch { throw invalid }
+                    guard let dataLength = (try? reader.read(count: 4)).map({ parse32bitIntBE($0) }) else { throw invalid }
+                    guard let imageData = try? reader.read(count: dataLength) else { throw invalid }
                     guard 4 + 4 + mimeLength + 4 + descLength + 16 + 4 + dataLength == length else { throw invalid }
                     guard let source = CGImageSourceCreateWithData(
                         imageData as CFData,
@@ -1191,7 +1190,7 @@ class FLACArtworkLoader: ArtworkLoader {
                     return image
                 }
             default:
-                guard reader.skip(count: length) else { throw invalid }
+                do { try reader.skip(count: length) } catch { throw invalid }
             }
         } while !last
         return nil

@@ -21,46 +21,53 @@ func readString(from url: URL) throws -> String {
     return string
 }
 
-fileprivate func errnoError() -> Error {
+fileprivate func makeErrorFromErrno() -> Error {
     NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
 }
 
 class FileReader {
+    struct InsufficientData: Error {}
+    struct InvalidArgument: Error {}
+
     private var file: UnsafeMutablePointer<FILE>
 
-    func read(count: Int) -> Data? {
-        guard count >= 0 else { return nil }
-        var buffer = Data(count: count)
-        let readCount = buffer.withUnsafeMutableBytes { ptr in
-            fread(ptr.baseAddress, 1, count, file)
-        }
+    func read(count: Int) throws -> Data {
+        guard count >= 0 else { throw InvalidArgument() }
+        let ptr = malloc(count)!
+        let readCount = fread(ptr, 1, count, file)
+        let buffer = Data(bytesNoCopy: ptr, count: count, deallocator: .free)
         guard readCount == count else {
             if ferror(file) != 0 {
-                fatalError(errnoError().localizedDescription)
+                throw makeErrorFromErrno()
             } else {
-                return nil
+                throw InsufficientData()
             }
         }
         return buffer
     }
 
-    func skip(count: Int) -> Bool {
-        return fseek(file, count, SEEK_CUR) == 0
+    func skip(count: Int) throws {
+        guard fseek(file, count, SEEK_CUR) == 0 else { throw makeErrorFromErrno() }
     }
 
-    init(url: URL) throws {
+    func seek(to pos: Int) throws {
+        guard fseek(file, pos, SEEK_SET) == 0 else { throw makeErrorFromErrno() }
+    }
+
+    init(url: URL, bufferSize: Int = 0) throws {
         guard let file = try url.withUnsafeFileSystemRepresentation({
             guard let ptr = $0 else { throw FileNotFound(url: url) }
             return fopen(ptr, "r")
         }) else {
-            throw errnoError()
+            throw makeErrorFromErrno()
         }
+        setvbuf(file, nil, _IOFBF, bufferSize)
         self.file = file
     }
 
     deinit {
         guard fclose(file) == 0 else {
-            fatalError(errnoError().localizedDescription)
+            fatalError(makeErrorFromErrno().localizedDescription)
         }
     }
 }
