@@ -4,29 +4,20 @@ import SwiftUI
 import UniformTypeIdentifiers
 import Collections
 
-func stringEncoding(for data: Data) -> String.Encoding? {
-    let encodingValue = NSString.stringEncoding(for: data, convertedString: nil, usedLossyConversion: nil)
-    if encodingValue == 0 {
-        return nil
-    } else {
-        return String.Encoding(rawValue: encodingValue)
-    }
-}
-
 func readData(from url: URL) throws -> Data {
     return try Data(contentsOf: url)
 }
 
-struct FileDecodingError: Error {
+struct FileDecodingError: FileError {
     let url: URL
+    static let prompt = "Cannot decode file"
 }
 
 func readString(from url: URL) throws -> String {
     let data = try readData(from: url)
-    let encoding = stringEncoding(for: data) ?? .utf8
-    guard let string = String(data: data, encoding: encoding) else {
-        throw FileDecodingError(url: url)
-    }
+    var decoded: NSString?
+    NSString.stringEncoding(for: data, encodingOptions: [.allowLossyKey: false], convertedString: &decoded, usedLossyConversion: nil)
+    guard let string = decoded.map({ $0 as String }) else { throw FileDecodingError(url: url) }
     return string
 }
 
