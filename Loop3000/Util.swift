@@ -102,11 +102,15 @@ extension UUID: Comparable {
     }
 }
 
-protocol EquatableIdentifiable: Identifiable, Equatable {}
+protocol Unique: Identifiable, Hashable {}
 
-extension EquatableIdentifiable {
+extension Unique {
     static func == (lhs: Self, rhs: Self) -> Bool {
         return lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
 }
 

@@ -232,13 +232,13 @@ extension Metadata: Codable {
     }
 }
 
-struct Album: EquatableIdentifiable, Codable {
+struct Album: Unique, Codable {
     private(set) var id = makeMonotonicUUID()
     var metadata = Metadata()
     var cover: Data?
 }
 
-struct Track: EquatableIdentifiable, Codable {
+struct Track: Unique, Codable {
     private(set) var id = UUID()
     var source: URL
     var start: CueTime
@@ -247,12 +247,12 @@ struct Track: EquatableIdentifiable, Codable {
     var metadata = Metadata()
 }
 
-struct PlaylistItem: EquatableIdentifiable, Codable {
+struct PlaylistItem: Unique, Codable {
     private(set) var id = UUID()
     var trackId: UUID
 }
 
-struct Playlist: EquatableIdentifiable, Codable {
+struct Playlist: Unique, Codable {
     private(set) var id = UUID()
     var title: String
     var items: [PlaylistItem]

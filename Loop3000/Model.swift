@@ -227,7 +227,7 @@ class MusicLibrary: ObservableObject {
 }
 
 @MainActor
-struct MusicPiece: EquatableIdentifiable, Hashable {
+struct MusicPiece: Unique, Hashable {
     let id: UUID
     unowned let musicLibrary: MusicLibrary
 
@@ -385,10 +385,6 @@ struct MusicPiece: EquatableIdentifiable, Hashable {
         let index = list.items.firstIndex(of: item)!
         guard index < list.items.count - 1 else { return nil }
         return MusicPiece(list.items[index + 1], musicLibrary: musicLibrary)
-    }
-
-    nonisolated func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
     }
 }
 
