@@ -156,36 +156,37 @@ extension CueTime: Codable {
     }
 }
 
-struct MetadataCommonKey {
-    let title = "TITLE"
-    let version = "VERSION"
-    let album = "ALBUM"
-    let trackNumber = "TRACKNUMBER"
-    let discNumber = "DISCNUMBER"
-    let artist = "ARTIST"
-    let albumArtist = "ALBUMARTIST"
-    let performer = "PERFORMER"
-    let composer = "COMPOSER"
-    let author = "AUTHOR"
-    let contributor = "CONTRIBUTOR"
-    let creator = "CREATOR"
-    let publisher = "PUBLISHER"
-    let copyright = "COPYRIGHT"
-    let license = "LICENSE"
-    let organization = "ORGANIZATION"
-    let description = "DESCRIPTION"
-    let genre = "GENRE"
-    let date = "DATE"
-    let language = "LANGUAGE"
-    let location = "LOCATION"
-    let ISRC = "ISRC"
-    let comment = "COMMENT"
-    let encoder = "ENCODER"
-}
-
-fileprivate let metadataCommonKey = MetadataCommonKey()
-
 struct Metadata {
+    struct CommonKey {
+        let title = "TITLE"
+        let version = "VERSION"
+        let album = "ALBUM"
+        let trackNumber = "TRACKNUMBER"
+        let discNumber = "DISCNUMBER"
+        let artist = "ARTIST"
+        let albumArtist = "ALBUMARTIST"
+        let performer = "PERFORMER"
+        let composer = "COMPOSER"
+        let author = "AUTHOR"
+        let contributor = "CONTRIBUTOR"
+        let creator = "CREATOR"
+        let publisher = "PUBLISHER"
+        let copyright = "COPYRIGHT"
+        let license = "LICENSE"
+        let organization = "ORGANIZATION"
+        let description = "DESCRIPTION"
+        let genre = "GENRE"
+        let date = "DATE"
+        let language = "LANGUAGE"
+        let location = "LOCATION"
+        let ISRC = "ISRC"
+        let comment = "COMMENT"
+        let encoder = "ENCODER"
+        // TODO: add more common key
+    }
+
+    fileprivate static let commonKey = CommonKey()
+
     private var metadata: [String: String] = [:]
 
     subscript(key: String) -> String? {
@@ -197,12 +198,12 @@ struct Metadata {
         }
     }
 
-    subscript(key: KeyPath<MetadataCommonKey, String>) -> String? {
+    subscript(key: KeyPath<Self.CommonKey, String>) -> String? {
         get {
-            metadata[metadataCommonKey[keyPath: key]]
+            metadata[Self.commonKey[keyPath: key]]
         }
         set(newValue) {
-            metadata[metadataCommonKey[keyPath: key]] = newValue
+            metadata[Self.commonKey[keyPath: key]] = newValue
         }
     }
 }
@@ -353,9 +354,9 @@ struct Shelf: Codable {
             for (key, _) in tracks.first!.metadata {
                 switch key {
                 case
-                    metadataCommonKey.trackNumber,
-                    metadataCommonKey.discNumber,
-                    metadataCommonKey.ISRC,
+                    Metadata.commonKey.trackNumber,
+                    Metadata.commonKey.discNumber,
+                    Metadata.commonKey.ISRC,
                     "TOTALDISCS",
                     "TOTALTRACKS",
                     "DISCTOTAL",
@@ -689,10 +690,10 @@ fileprivate func mergeAlbums(_ a: Album, _ tracksA: [Track], _ b: Album, _ track
     var artistA = a.metadata[\.artist]
     var artistB = b.metadata[\.artist]
     if artistA != nil && artistB == nil {
-        artistB = commonMetadata(tracksB, for: metadataCommonKey.artist)
+        artistB = commonMetadata(tracksB, for: Metadata.commonKey.artist)
     }
     if artistA == nil && artistB != nil {
-        artistA = commonMetadata(tracksA, for: metadataCommonKey.artist)
+        artistA = commonMetadata(tracksA, for: Metadata.commonKey.artist)
     }
     guard artistA == artistB else { return nil }
     for trackA in tracksA {
@@ -869,21 +870,21 @@ fileprivate class CueSheetImporter: MediaImporter {
                     ()
                 }
             case ("SONGWRITER", 1):
-                setMetadata(for: metadataCommonKey.composer)
+                setMetadata(for: Metadata.commonKey.composer)
             case ("ISRC", 1):
-                setMetadata(for: metadataCommonKey.ISRC)
+                setMetadata(for: Metadata.commonKey.ISRC)
             case ("PERFORMER", 1):
-                setMetadata(for: metadataCommonKey.artist)
+                setMetadata(for: Metadata.commonKey.artist)
             case ("TITLE", 1):
-                setMetadata(for: metadataCommonKey.title)
+                setMetadata(for: Metadata.commonKey.title)
             case ("REM", 2):
                 switch params[0] {
                 case "DATE":
-                    setMetadata(params[1], for: metadataCommonKey.date)
+                    setMetadata(params[1], for: Metadata.commonKey.date)
                 case "COMPOSER":
-                    setMetadata(params[1], for: metadataCommonKey.composer)
+                    setMetadata(params[1], for: Metadata.commonKey.composer)
                 case "GENRE":
-                    setMetadata(params[1], for: metadataCommonKey.genre)
+                    setMetadata(params[1], for: Metadata.commonKey.genre)
                 case "DISCNUMBER":
                     discNumber = Int(params[1])
                 default:
@@ -1010,17 +1011,17 @@ fileprivate class AVAssetGrabber: MetadataGrabber {
     let supportedTypes = [UTType.audio]
 
     private static let keyMapping: [AVMetadataKey: String] = [
-        .commonKeyAlbumName: metadataCommonKey.album,
-        .commonKeyArtist: metadataCommonKey.artist,
-        .commonKeyAuthor: metadataCommonKey.author,
-        .commonKeyContributor: metadataCommonKey.contributor,
-        .commonKeyCopyrights: metadataCommonKey.copyright,
-        .commonKeyCreator: metadataCommonKey.creator,
-        .commonKeyTitle: metadataCommonKey.title,
-        .commonKeyDescription: metadataCommonKey.description,
-        .commonKeyLanguage: metadataCommonKey.language,
-        .commonKeyLocation: metadataCommonKey.location,
-        .commonKeyPublisher: metadataCommonKey.publisher,
+        .commonKeyAlbumName: Metadata.commonKey.album,
+        .commonKeyArtist: Metadata.commonKey.artist,
+        .commonKeyAuthor: Metadata.commonKey.author,
+        .commonKeyContributor: Metadata.commonKey.contributor,
+        .commonKeyCopyrights: Metadata.commonKey.copyright,
+        .commonKeyCreator: Metadata.commonKey.creator,
+        .commonKeyTitle: Metadata.commonKey.title,
+        .commonKeyDescription: Metadata.commonKey.description,
+        .commonKeyLanguage: Metadata.commonKey.language,
+        .commonKeyLocation: Metadata.commonKey.location,
+        .commonKeyPublisher: Metadata.commonKey.publisher,
     ]
 
     func grabMetadata(url: URL, choker: RequestChoker?) async throws -> Metadata {
