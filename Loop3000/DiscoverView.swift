@@ -20,6 +20,7 @@ struct DiscoverView: View {
     }
 
     @State private var processing = false
+    @State private var uniqueRequesting: [URL] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -31,7 +32,10 @@ struct DiscoverView: View {
                         refreshTick += 1
                     })
                 Divider()
-                if model.musicLibrary.requesting.isEmpty {
+                    .onReceive(model.guiRefreshTimer) { _ in
+                        uniqueRequesting = model.musicLibrary.requesting.removingDuplicates()
+                    }
+                if uniqueRequesting.isEmpty {
                     Spacer()
                     HStack {
                         Spacer()
@@ -40,7 +44,7 @@ struct DiscoverView: View {
                     }
                     Spacer()
                 } else {
-                    List(model.musicLibrary.requesting.removingDuplicates()) { url in
+                    List(uniqueRequesting) { url in
                         HStack(spacing: 8) {
                             ProgressView().scaleEffect(0.5)
                             Text(url.pathDescription)
