@@ -622,21 +622,27 @@ fileprivate func mergeShelf(_ a: Shelf, _ b: Shelf) -> Shelf {
     var unconsolidatedAlbums = (a.albums + b.albums).filter { usedAlbumIds.contains($0.id) }
     unconsolidatedAlbums.reverse()
     var consolidatedAlbums: [Album] = []
+    var trackCache: [UUID: [Track]] = [:]
+    for track in mergedShelf.tracks {
+        if trackCache[track.albumId] == nil {
+            trackCache[track.albumId] = [track]
+        } else {
+            trackCache[track.albumId]!.append(track)
+        }
+    }
     while var album = unconsolidatedAlbums.popLast() {
         unconsolidatedAlbums = unconsolidatedAlbums.compactMap { otherAlbum in
             guard let mergedAlbum = mergeAlbums(
                 album,
-                mergedShelf.getTracks(for: album),
+                trackCache[album.id]!,
                 otherAlbum,
-                mergedShelf.getTracks(for: otherAlbum)
+                trackCache[otherAlbum.id]!
             ) else { return otherAlbum }
-            mergedShelf.tracks = mergedShelf.tracks
-                .map {
-                    var track = $0
-                    if track.albumId == album.id || track.albumId == otherAlbum.id {
-                        track.albumId = mergedAlbum.id
-                    }
-                    return track
+            trackCache[mergedAlbum.id] = []
+            mergedShelf.tracks
+                .modifyEach { $0.albumId == album.id || $0.albumId == otherAlbum.id } modifier: {
+                    $0.albumId = mergedAlbum.id
+                    trackCache[mergedAlbum.id]!.append($0)
                 }
             album = mergedAlbum
             return nil
