@@ -354,7 +354,11 @@ fileprivate struct MetadataView: View {
                             )
                             .clickable(enabled: isFile)
                             .onTapGesture {
-                                NSWorkspace.shared.activateFileViewerSelecting([track.source])
+                                Task {
+                                    (try? await model.musicLibrary.startAccess(url: track.source)).map {
+                                        NSWorkspace.shared.activateFileViewerSelecting([$0])
+                                    }
+                                }
                             }
                         }
                     }
