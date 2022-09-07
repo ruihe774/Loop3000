@@ -214,12 +214,14 @@ class MusicLibrary: ObservableObject {
             let url = try loadURLFromBookmark(&bookmark)
             return (url, bookmark)
         }
-        shelf.discoverLog.items.modifyEach { $0.url == url } modifier: {
-            $0.url = loadedURL
-            $0.bookmark = newBookmark
-        }
-        shelf.tracks.modifyEach { $0.source == url } modifier: {
-            $0.source = loadedURL
+        if url != loadedURL || bookmark != newBookmark {
+            shelf.discoverLog.items.modifyEach { $0.url == url } modifier: {
+                $0.url = loadedURL
+                $0.bookmark = newBookmark
+            }
+            shelf.tracks.modifyEach { $0.source == url } modifier: {
+                $0.source = loadedURL
+            }
         }
         return loadedURL
     }
