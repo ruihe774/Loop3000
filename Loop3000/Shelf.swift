@@ -1120,12 +1120,20 @@ extension Shelf {
             for (albumId, image) in zip(albumIds, scaledImages) {
                 taskGroup.addTask {
                     await DispatchQueue.global().swiftAsync {
+                        #if arch(arm64)
                         (albumId, cictx.heifRepresentation(
                             of: image,
                             format: .BGRA8,     // I did not figure out what this argument means.
                             colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
                             options: [.init(rawValue: kCGImageDestinationLossyCompressionQuality as String): 0.75]
                         )!)
+                        #else
+                        (albumId, cictx.jpegRepresentation(
+                            of: image,
+                            colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
+                            options: [.init(rawValue: kCGImageDestinationLossyCompressionQuality as String): 0.75]
+                        )!)
+                        #endif
                     }
                 }
             }
