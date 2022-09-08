@@ -24,7 +24,7 @@ struct SpectrumView: View {
         count: Self.numBands,
         isHalfWindow: false
     )
-    @State private var sampleBuffers: [CMSampleBuffer] = []
+    @State private var sampleBuffers: Deque<CMSampleBuffer> = []
     @State private var sampleRate = 0
     @State private var spectrums: Deque<[[Float]]> = []
     @State private var images: [CGImage] = []
@@ -94,15 +94,13 @@ struct SpectrumView: View {
            forRange: (mergedSampleBuffer.numSamples - trimLast - numSamples) ..< (mergedSampleBuffer.numSamples - trimLast)
         )
         blockBuffer = mergedSampleBuffer.dataBuffer!
-        let originalSampleBuffers = sampleBuffers
-        sampleBuffers = []
+        sampleBuffers.removeFirst(sampleBufferIndex + 1)
         if trimLast > 0 {
-           sampleBuffers.append(try! CMSampleBuffer(
+           sampleBuffers.prepend(try! CMSampleBuffer(
                copying: lastSampleBuffer,
                forRange: (lastSampleBuffer.numSamples - trimLast) ..< lastSampleBuffer.numSamples)
            )
         }
-        sampleBuffers.append(contentsOf: originalSampleBuffers[(sampleBufferIndex + 1)...])
         let channelBuffers = try! blockBuffer.withContiguousStorage { ptr in
            if isFloat {
                let blockBuffer = ptr.assumingMemoryBound(to: Float.self)
