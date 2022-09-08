@@ -2,9 +2,9 @@ import Accelerate
 import CoreVideo
 import CoreMedia
 import CoreText
+import CoreGraphics
+import CoreImage
 import SwiftUI
-import Charts
-import Combine
 import Collections
 
 struct SpectrumView: View {
@@ -220,23 +220,23 @@ struct SpectrumView: View {
 
 fileprivate func soxPalette(level: Float) -> (r: Float, g: Float, b: Float){
     var r: Float = 0.0;
-    if (level >= 0.13 && level < 0.73) {
+    if level >= 0.13 && level < 0.73 {
         r = sin((level - 0.13) / 0.60 * Float.pi / 2.0);
-    } else if (level >= 0.73) {
+    } else if level >= 0.73 {
         r = 1.0;
     }
 
     var g: Float = 0.0;
-    if (level >= 0.6 && level < 0.91) {
+    if level >= 0.6 && level < 0.91 {
         g = sin((level - 0.6) / 0.31 * Float.pi / 2.0);
-    } else if (level >= 0.91) {
+    } else if level >= 0.91 {
         g = 1.0;
     }
 
     var b: Float = 0.0;
-    if (level < 0.60) {
+    if level < 0.60 {
         b = 0.5 * sin(level / 0.6 * Float.pi);
-    } else if (level >= 0.78) {
+    } else if level >= 0.78 {
         b = (level - 0.78) / 0.22;
     }
 
@@ -245,7 +245,7 @@ fileprivate func soxPalette(level: Float) -> (r: Float, g: Float, b: Float){
 
 fileprivate let soxColorMap = {
     var outPixelBuffer: CVPixelBuffer?
-    CVPixelBufferCreate(kCFAllocatorDefault, 256, 1, kCMPixelFormat_32BGRA, nil, &outPixelBuffer)
+    CVPixelBufferCreate(nil, 256, 1, kCMPixelFormat_32BGRA, nil, &outPixelBuffer)
     let pixelBuffer = outPixelBuffer!
     CVPixelBufferLockBaseAddress(pixelBuffer, .init(rawValue: 0))
     defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .init(rawValue: 0)) }
