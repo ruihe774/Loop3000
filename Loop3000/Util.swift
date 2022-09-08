@@ -427,4 +427,16 @@ extension View {
                 }
             }
     }
+
+    func onValue<T: Equatable>(of value: T, onAppear: Bool = true, perform: @escaping (T) -> ()) -> some View {
+        self
+            .onChange(of: value) { value in
+                perform(value)
+            }
+            .onAppear {
+                if onAppear {
+                    perform(value)
+                }
+            }
+    }
 }
