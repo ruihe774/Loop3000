@@ -150,7 +150,7 @@ struct SpectrumView: View {
     private func redraw() {
         guard let channels = spectrums.first?.count else { return }
         let width = Int(geometrySize.width) / 2
-        let height = Self.numBands / 3
+        let height = Self.numBands / 2
         let exp: Float = 2
         let corr = Float(Self.numBands / 2) / pow(Float(height), exp)
         let freqBin = Float(sampleRate) / Float(Self.numBands)
@@ -169,7 +169,9 @@ struct SpectrumView: View {
                assert(i < width)
                for j in 0 ..< height {
                    let pixelPtr = (ptr + bytesPerRow * j).assumingMemoryBound(to: UInt32.self) + i
-                   let db = freqBuffer[min(freqBuffer.count - 1, Int(round(corr * pow(Float(j), exp))))]
+                   let x = corr * pow(Float(j), exp)
+                   let ix = Int(x)
+                   let db = freqBuffer[ix] * (Float(ix + 1) - x) + freqBuffer[ix + 1] * (x - Float(ix))
                    let level = max(0, db / 120 + 1)
                    let intLevel = UInt32(level * 255)
                    pixelPtr.pointee = intLevel << 16 | intLevel << 8 | intLevel | 0xff000000
