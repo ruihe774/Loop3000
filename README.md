@@ -16,3 +16,5 @@ An opinionated music player
 ## Build
 
 You can build Loop3000 with Xcode. macOS 13.0 SDK is required.
+
+Before you build, you need to put libflac and libogg in static library search path, and put FLAC headers in include directory.
